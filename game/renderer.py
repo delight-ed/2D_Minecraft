@@ -35,6 +35,28 @@ class Renderer:
                             outline_color = tuple(max(0, c - 30) for c in color)
                             pygame.draw.rect(self.screen, outline_color, 
                                            (screen_x, screen_y, BLOCK_SIZE, BLOCK_SIZE), 1)
+        
+        # Draw item drops
+        self.draw_item_drops(world, camera)
+    
+    def draw_item_drops(self, world, camera):
+        """Draw item drops in the world"""
+        for item in world.item_drops:
+            screen_x = item['x'] - camera.x
+            screen_y = item['y'] - camera.y
+            
+            # Only draw if on screen
+            if (-16 <= screen_x <= SCREEN_WIDTH and -16 <= screen_y <= SCREEN_HEIGHT):
+                # Draw item as a smaller colored square
+                color = BLOCK_COLORS.get(item['type'], WHITE)
+                if color:
+                    pygame.draw.rect(self.screen, color, (screen_x - 8, screen_y - 8, 16, 16))
+                    pygame.draw.rect(self.screen, BLACK, (screen_x - 8, screen_y - 8, 16, 16), 1)
+                    
+                    # Add a slight bounce effect
+                    bounce = abs((item['time'] % 20) - 10) * 0.5
+                    pygame.draw.rect(self.screen, WHITE, 
+                                   (screen_x - 6, screen_y - 6 - bounce, 12, 12), 1)
     
     def draw_hotbar(self, player):
         """Draw the hotbar at the bottom of the screen"""
@@ -91,14 +113,14 @@ class Renderer:
         
         # Draw controls
         controls = [
-            "WASD - Move | Space - Jump",
+            "WASD - Move | Space - Jump | E - Inventory",
             "Left Click - Mine | Right Click - Place",
             "1-9 - Select Hotbar Slot"
         ]
         
         for i, control in enumerate(controls):
             text = self.small_font.render(control, True, WHITE)
-            self.screen.blit(text, (10, SCREEN_HEIGHT - 60 + i * 20))
+            self.screen.blit(text, (10, SCREEN_HEIGHT - 80 + i * 20))
         
         # Draw hotbar
         self.draw_hotbar(player)

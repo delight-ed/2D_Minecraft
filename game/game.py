@@ -5,6 +5,7 @@ from .world import World
 from .player import Player
 from .camera import Camera
 from .renderer import Renderer
+from .inventory import InventoryGUI
 
 class Game:
     def __init__(self):
@@ -25,6 +26,7 @@ class Game:
         self.player = Player(spawn_x, spawn_y)
         self.camera = Camera()
         self.renderer = Renderer(self.screen)
+        self.inventory_gui = InventoryGUI(self.screen)
         
         self.running = True
         print("Game initialized!")
@@ -41,27 +43,42 @@ class Game:
                     slot = event.key - pygame.K_1
                     self.player.select_hotbar_slot(slot)
                 
+                # Toggle inventory
+                elif event.key == pygame.K_e:
+                    self.inventory_gui.toggle()
+                
                 # Quit game
                 elif event.key == pygame.K_ESCAPE:
                     self.running = False
             
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                mouse_x, mouse_y = pygame.mouse.get_pos()
+                # Check if clicking in inventory first
+                if self.inventory_gui.handle_click(event.pos[0], event.pos[1], self.player):
+                    continue
                 
-                if event.button == 1:  # Left click - mine
-                    self.player.mine_block(self.world, mouse_x, mouse_y, 
-                                         self.camera.x, self.camera.y)
-                
-                elif event.button == 3:  # Right click - place
-                    self.player.place_block(self.world, mouse_x, mouse_y,
-                                          self.camera.x, self.camera.y)
+                # Only handle world interactions if inventory is closed
+                if not self.inventory_gui.is_open:
+                    mouse_x, mouse_y = pygame.mouse.get_pos()
+                    
+                    if event.button == 1:  # Left click - mine
+                        self.player.mine_block(self.world, mouse_x, mouse_y, 
+                                             self.camera.x, self.camera.y)
+                    
+                    elif event.button == 3:  # Right click - place
+                        self.player.place_block(self.world, mouse_x, mouse_y,
+                                              self.camera.x, self.camera.y)
     
     def update(self):
         """Update game state"""
-        keys = pygame.key.get_pressed()
-        self.player.handle_input(keys)
+        # Only update player movement if inventory is closed
+        if not self.inventory_gui.is_open:
+            keys = pygame.key.get_pressed()
+            self.player.handle_input(keys)
+        
         self.player.update(self.world)
+        self.player.pickup_items(self.world)
         self.camera.update(self.player)
+        self.world.update_item_drops()
     
     def draw(self):
         """Draw everything"""
@@ -73,6 +90,9 @@ class Game:
         
         # Draw UI
         self.renderer.draw_ui(self.player)
+        
+        # Draw inventory GUI on top
+        self.inventory_gui.draw(self.player)
         
         pygame.display.flip()
     

@@ -6,6 +6,7 @@ class World:
     def __init__(self):
         self.blocks = [[BLOCK_AIR for _ in range(WORLD_HEIGHT)] for _ in range(WORLD_WIDTH)]
         self.biomes = [BIOME_PLAINS for _ in range(WORLD_WIDTH)]
+        self.item_drops = []  # List of item drops in the world
         self.generate_world()
     
     def generate_world(self):
@@ -142,6 +143,40 @@ class World:
                     self.get_block(leaf_x, leaf_y) == BLOCK_AIR and
                     random.random() < 0.8):
                     self.blocks[leaf_x][leaf_y] = BLOCK_LEAVES
+    
+    def add_item_drop(self, x, y, item_type):
+        """Add an item drop to the world"""
+        self.item_drops.append({
+            'x': x,
+            'y': y,
+            'type': item_type,
+            'vel_y': -2,  # Initial upward velocity
+            'time': 0
+        })
+    
+    def update_item_drops(self):
+        """Update physics for item drops"""
+        for item in self.item_drops:
+            item['time'] += 1
+            
+            # Apply gravity
+            item['vel_y'] += 0.3
+            if item['vel_y'] > 8:
+                item['vel_y'] = 8
+            
+            # Move item
+            new_y = item['y'] + item['vel_y']
+            
+            # Check collision with ground
+            block_x = int(item['x'] // BLOCK_SIZE)
+            block_y = int(new_y // BLOCK_SIZE)
+            
+            if self.is_solid(block_x, block_y):
+                # Find the top of the block
+                item['y'] = block_y * BLOCK_SIZE - 8
+                item['vel_y'] = 0
+            else:
+                item['y'] = new_y
     
     def get_block(self, x, y):
         """Get block at position"""
