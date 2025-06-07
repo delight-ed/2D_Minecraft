@@ -35,18 +35,30 @@ BLOCK_LEAVES = 7
 BLOCK_COAL = 8
 BLOCK_IRON = 9
 
-# Block colors
+# Block colors with 8-bit style
 BLOCK_COLORS = {
     BLOCK_AIR: None,
-    BLOCK_DIRT: BROWN,
-    BLOCK_GRASS: GREEN,
-    BLOCK_STONE: GRAY,
-    BLOCK_WATER: BLUE,
-    BLOCK_SAND: YELLOW,
-    BLOCK_WOOD: LIGHT_BROWN,
-    BLOCK_LEAVES: DARK_GREEN,
-    BLOCK_COAL: DARK_GRAY,
-    BLOCK_IRON: (192, 192, 192)
+    BLOCK_DIRT: (101, 67, 33),      # Darker brown
+    BLOCK_GRASS: (34, 139, 34),     # Green
+    BLOCK_STONE: (105, 105, 105),   # Gray
+    BLOCK_WATER: (30, 144, 255),    # Blue
+    BLOCK_SAND: (238, 203, 173),    # Sandy color
+    BLOCK_WOOD: (139, 90, 43),      # Wood brown
+    BLOCK_LEAVES: (0, 100, 0),      # Dark green
+    BLOCK_COAL: (36, 36, 36),       # Very dark gray
+    BLOCK_IRON: (169, 169, 169)     # Light gray
+}
+
+# Item types (for crafting)
+ITEM_STICK = "stick"
+ITEM_CRAFTING_TABLE = "crafting_table"
+ITEM_WOODEN_PICKAXE = "wooden_pickaxe"
+
+# Item colors for rendering
+ITEM_COLORS = {
+    ITEM_STICK: (139, 90, 43),
+    ITEM_CRAFTING_TABLE: (160, 82, 45),
+    ITEM_WOODEN_PICKAXE: (139, 90, 43)
 }
 
 # World settings

@@ -11,9 +11,9 @@ class Player:
         self.vel_x = 0
         self.vel_y = 0
         self.speed = 6
-        # Minecraft player can jump 1.25 blocks high (1 block + 8 pixels)
+        # Minecraft player can jump exactly 1.25 blocks high
         # With 32px blocks, that's 40 pixels total jump height
-        self.jump_power = 14  # Reduced from 16 to match Minecraft jump height
+        self.jump_power = 12.5  # Adjusted for exactly 1.25 blocks
         self.gravity = 0.8
         self.on_ground = False
         self.keybinds = keybinds
@@ -331,33 +331,47 @@ class Player:
                 world.item_drops.remove(item)
     
     def draw(self, screen, camera_x, camera_y):
-        """Draw player"""
+        """Draw player with 8-bit style"""
         screen_x = self.x - camera_x
         screen_y = self.y - camera_y
         
         # Only draw if player is on screen
         if (-self.width <= screen_x <= SCREEN_WIDTH and -self.height <= screen_y <= SCREEN_HEIGHT):
-            # Draw player body with gradient
+            # Draw player body with 8-bit style
             body_rect = pygame.Rect(screen_x, screen_y, self.width, self.height)
             
-            # Body gradient
-            for y in range(self.height):
-                color_value = 100 + int((y / self.height) * 100)
-                color = (color_value, color_value + 50, 255)
-                pygame.draw.line(screen, color, 
-                               (screen_x, screen_y + y), 
-                               (screen_x + self.width, screen_y + y))
+            # Main body color (blue shirt)
+            pygame.draw.rect(screen, (0, 100, 200), body_rect)
+            
+            # Head (top quarter)
+            head_height = self.height // 4
+            head_rect = pygame.Rect(screen_x, screen_y, self.width, head_height)
+            pygame.draw.rect(screen, (255, 220, 177), head_rect)  # Skin color
+            
+            # Pants (bottom half)
+            pants_height = self.height // 2
+            pants_rect = pygame.Rect(screen_x, screen_y + self.height - pants_height, self.width, pants_height)
+            pygame.draw.rect(screen, (50, 50, 150), pants_rect)  # Dark blue pants
             
             # Body outline
             pygame.draw.rect(screen, BLACK, body_rect, 2)
             
-            # Draw simple face
-            eye_size = 3
-            pygame.draw.circle(screen, BLACK, (int(screen_x + self.width * 0.3), int(screen_y + 8)), eye_size)
-            pygame.draw.circle(screen, BLACK, (int(screen_x + self.width * 0.7), int(screen_y + 8)), eye_size)
+            # Draw pixelated face
+            eye_size = 2
+            # Eyes
+            pygame.draw.rect(screen, BLACK, (int(screen_x + self.width * 0.25), int(screen_y + 6), eye_size, eye_size))
+            pygame.draw.rect(screen, BLACK, (int(screen_x + self.width * 0.75 - eye_size), int(screen_y + 6), eye_size, eye_size))
             
-            # Draw mouth
-            mouth_y = int(screen_y + 16)
-            pygame.draw.arc(screen, BLACK, 
-                          (int(screen_x + self.width * 0.3), mouth_y - 2, 
-                           int(self.width * 0.4), 6), 0, 3.14, 2)
+            # Mouth (simple line)
+            mouth_y = int(screen_y + 12)
+            pygame.draw.rect(screen, BLACK, (int(screen_x + self.width * 0.4), mouth_y, int(self.width * 0.2), 1))
+            
+            # Arms (simple rectangles on sides)
+            arm_width = 4
+            arm_height = self.height // 3
+            # Left arm
+            pygame.draw.rect(screen, (255, 220, 177), (screen_x - arm_width, screen_y + head_height, arm_width, arm_height))
+            pygame.draw.rect(screen, BLACK, (screen_x - arm_width, screen_y + head_height, arm_width, arm_height), 1)
+            # Right arm
+            pygame.draw.rect(screen, (255, 220, 177), (screen_x + self.width, screen_y + head_height, arm_width, arm_height))
+            pygame.draw.rect(screen, BLACK, (screen_x + self.width, screen_y + head_height, arm_width, arm_height), 1)

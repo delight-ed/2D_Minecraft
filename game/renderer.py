@@ -8,7 +8,7 @@ class Renderer:
         self.small_font = pygame.font.Font(None, 18)
     
     def draw_world(self, world, camera):
-        """Draw the world blocks"""
+        """Draw the world blocks with 8-bit style textures"""
         # Calculate visible block range with some padding
         start_x = max(-50, int(camera.x // BLOCK_SIZE) - 1)
         end_x = int((camera.x + SCREEN_WIDTH) // BLOCK_SIZE) + 2
@@ -31,16 +31,88 @@ class Renderer:
                         # Only draw if on screen
                         if (-BLOCK_SIZE <= screen_x <= SCREEN_WIDTH and 
                             -BLOCK_SIZE <= screen_y <= SCREEN_HEIGHT):
-                            pygame.draw.rect(self.screen, color, 
-                                           (screen_x, screen_y, BLOCK_SIZE, BLOCK_SIZE))
                             
-                            # Draw block outline for better visibility
-                            outline_color = tuple(max(0, c - 30) for c in color)
-                            pygame.draw.rect(self.screen, outline_color, 
-                                           (screen_x, screen_y, BLOCK_SIZE, BLOCK_SIZE), 1)
+                            # Draw 8-bit style block texture
+                            self.draw_block_texture(screen_x, screen_y, block_type)
         
         # Draw item drops
         self.draw_item_drops(world, camera)
+    
+    def draw_block_texture(self, x, y, block_type):
+        """Draw 8-bit style block textures"""
+        if block_type == BLOCK_GRASS:
+            # Grass block - brown base with green top
+            pygame.draw.rect(self.screen, (101, 67, 33), (x, y, BLOCK_SIZE, BLOCK_SIZE))
+            pygame.draw.rect(self.screen, (34, 139, 34), (x, y, BLOCK_SIZE, BLOCK_SIZE // 3))
+            # Add grass texture
+            for i in range(2, BLOCK_SIZE, 4):
+                pygame.draw.line(self.screen, (20, 100, 20), (x + i, y), (x + i, y + BLOCK_SIZE // 3))
+        
+        elif block_type == BLOCK_DIRT:
+            # Dirt texture
+            pygame.draw.rect(self.screen, (101, 67, 33), (x, y, BLOCK_SIZE, BLOCK_SIZE))
+            # Add dirt spots
+            for i in range(4, BLOCK_SIZE, 8):
+                for j in range(4, BLOCK_SIZE, 8):
+                    pygame.draw.rect(self.screen, (80, 50, 25), (x + i, y + j, 3, 3))
+        
+        elif block_type == BLOCK_STONE:
+            # Stone texture
+            pygame.draw.rect(self.screen, (105, 105, 105), (x, y, BLOCK_SIZE, BLOCK_SIZE))
+            # Add stone pattern
+            for i in range(2, BLOCK_SIZE, 6):
+                for j in range(2, BLOCK_SIZE, 6):
+                    pygame.draw.rect(self.screen, (85, 85, 85), (x + i, y + j, 2, 2))
+        
+        elif block_type == BLOCK_WOOD:
+            # Wood texture with grain
+            pygame.draw.rect(self.screen, (139, 90, 43), (x, y, BLOCK_SIZE, BLOCK_SIZE))
+            # Add wood grain
+            for i in range(0, BLOCK_SIZE, 2):
+                pygame.draw.line(self.screen, (120, 75, 35), (x, y + i), (x + BLOCK_SIZE, y + i))
+        
+        elif block_type == BLOCK_LEAVES:
+            # Leaves texture
+            pygame.draw.rect(self.screen, (0, 100, 0), (x, y, BLOCK_SIZE, BLOCK_SIZE))
+            # Add leaf pattern
+            for i in range(1, BLOCK_SIZE, 4):
+                for j in range(1, BLOCK_SIZE, 4):
+                    if (i + j) % 8 < 4:
+                        pygame.draw.rect(self.screen, (0, 120, 0), (x + i, y + j, 2, 2))
+        
+        elif block_type == BLOCK_SAND:
+            # Sand texture
+            pygame.draw.rect(self.screen, (238, 203, 173), (x, y, BLOCK_SIZE, BLOCK_SIZE))
+            # Add sand grains
+            for i in range(1, BLOCK_SIZE, 3):
+                for j in range(1, BLOCK_SIZE, 3):
+                    if (i * j) % 7 < 3:
+                        pygame.draw.rect(self.screen, (220, 185, 155), (x + i, y + j, 1, 1))
+        
+        elif block_type == BLOCK_COAL:
+            # Coal texture
+            pygame.draw.rect(self.screen, (36, 36, 36), (x, y, BLOCK_SIZE, BLOCK_SIZE))
+            # Add coal spots
+            for i in range(3, BLOCK_SIZE, 7):
+                for j in range(3, BLOCK_SIZE, 7):
+                    pygame.draw.rect(self.screen, (20, 20, 20), (x + i, y + j, 2, 2))
+        
+        elif block_type == BLOCK_IRON:
+            # Iron texture
+            pygame.draw.rect(self.screen, (169, 169, 169), (x, y, BLOCK_SIZE, BLOCK_SIZE))
+            # Add iron spots
+            for i in range(2, BLOCK_SIZE, 6):
+                for j in range(2, BLOCK_SIZE, 6):
+                    pygame.draw.rect(self.screen, (140, 140, 140), (x + i, y + j, 3, 3))
+        
+        else:
+            # Default block rendering
+            color = BLOCK_COLORS.get(block_type, WHITE)
+            pygame.draw.rect(self.screen, color, (x, y, BLOCK_SIZE, BLOCK_SIZE))
+        
+        # Draw block outline for better visibility
+        outline_color = (0, 0, 0, 100)  # Semi-transparent black
+        pygame.draw.rect(self.screen, outline_color, (x, y, BLOCK_SIZE, BLOCK_SIZE), 1)
     
     def draw_item_drops(self, world, camera):
         """Draw item drops in the world"""
@@ -50,11 +122,19 @@ class Renderer:
             
             # Only draw if on screen
             if (-20 <= screen_x <= SCREEN_WIDTH and -20 <= screen_y <= SCREEN_HEIGHT):
-                # Draw item as a smaller colored square
-                color = BLOCK_COLORS.get(item['type'], WHITE)
+                # Draw item as a smaller colored square with 8-bit style
+                item_size = 12
+                
+                # Get color for item
+                if item['type'] in BLOCK_COLORS:
+                    color = BLOCK_COLORS[item['type']]
+                elif item['type'] in ITEM_COLORS:
+                    color = ITEM_COLORS[item['type']]
+                else:
+                    color = (200, 200, 200)
+                
                 if color:
                     # Main item body
-                    item_size = 12
                     pygame.draw.rect(self.screen, color, 
                                    (screen_x - item_size//2, screen_y - item_size//2, item_size, item_size))
                     pygame.draw.rect(self.screen, BLACK, 
@@ -62,8 +142,8 @@ class Renderer:
                     
                     # Add a subtle glow effect
                     glow_size = item_size + 4
-                    glow_color = tuple(min(255, c + 50) for c in color)
-                    glow_alpha = 100
+                    glow_color = tuple(min(255, c + 30) for c in color)
+                    glow_alpha = 80
                     
                     glow_surface = pygame.Surface((glow_size, glow_size))
                     glow_surface.set_alpha(glow_alpha)
@@ -113,15 +193,21 @@ class Renderer:
             if i < len(player.hotbar):
                 block_type = player.hotbar[i]
                 if block_type != BLOCK_AIR:
-                    color = BLOCK_COLORS.get(block_type, WHITE)
+                    # Get color for item
+                    if block_type in BLOCK_COLORS:
+                        color = BLOCK_COLORS[block_type]
+                    elif block_type in ITEM_COLORS:
+                        color = ITEM_COLORS[block_type]
+                    else:
+                        color = (200, 200, 200)
+                    
                     if color:
                         block_size = HOTBAR_SLOT_SIZE - 10
                         block_x = slot_x + 5
                         block_y = slot_y + 5
-                        pygame.draw.rect(self.screen, color, 
-                                       (block_x, block_y, block_size, block_size))
-                        pygame.draw.rect(self.screen, BLACK, 
-                                       (block_x, block_y, block_size, block_size), 1)
+                        
+                        # Draw 8-bit style icon
+                        self.draw_hotbar_icon(block_x, block_y, block_size, block_type)
                     
                     # Draw count
                     if block_type in player.inventory:
@@ -143,6 +229,32 @@ class Renderer:
             shadow_text = self.small_font.render(str(i + 1), True, BLACK)
             self.screen.blit(shadow_text, (slot_x + 3, slot_y - 17))
             self.screen.blit(number_text, (slot_x + 2, slot_y - 18))
+    
+    def draw_hotbar_icon(self, x, y, size, item_type):
+        """Draw 8-bit style icons for hotbar"""
+        if item_type == BLOCK_GRASS:
+            pygame.draw.rect(self.screen, (101, 67, 33), (x, y, size, size))
+            pygame.draw.rect(self.screen, (34, 139, 34), (x, y, size, size // 3))
+        elif item_type == ITEM_STICK:
+            stick_width = size // 4
+            stick_x = x + (size - stick_width) // 2
+            pygame.draw.rect(self.screen, (139, 90, 43), (stick_x, y + 2, stick_width, size - 4))
+        elif item_type == ITEM_CRAFTING_TABLE:
+            pygame.draw.rect(self.screen, (160, 82, 45), (x, y, size, size))
+            pygame.draw.line(self.screen, (100, 50, 25), (x + size//2, y), (x + size//2, y + size))
+            pygame.draw.line(self.screen, (100, 50, 25), (x, y + size//2), (x + size, y + size//2))
+        else:
+            # Default rendering
+            if item_type in BLOCK_COLORS:
+                color = BLOCK_COLORS[item_type]
+            elif item_type in ITEM_COLORS:
+                color = ITEM_COLORS[item_type]
+            else:
+                color = (200, 200, 200)
+            
+            pygame.draw.rect(self.screen, color, (x, y, size, size))
+        
+        pygame.draw.rect(self.screen, BLACK, (x, y, size, size), 1)
     
     def draw_ui(self, player):
         """Draw user interface"""

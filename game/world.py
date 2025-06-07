@@ -338,44 +338,26 @@ class World:
             'vel_y': -2,  # Initial upward velocity
             'vel_x': random.uniform(-1, 1),  # Random horizontal velocity
             'time': 0,
-            'on_ground': False,
-            'at_rest': False  # New flag to track if item is completely at rest
+            'on_ground': False
         })
     
     def update_item_drops(self):
-        """Update physics for item drops"""
+        """Update physics for item drops - no sliding, proper falling"""
         for item in self.item_drops:
             item['time'] += 1
             
-            # Skip physics if item is at rest
-            if item['at_rest']:
-                # Check if the block below was removed
-                block_x = int(item['x'] // BLOCK_SIZE)
-                block_y = int((item['y'] + 8) // BLOCK_SIZE)  # Check block below item
-                
-                if not self.is_solid(block_x, block_y):
-                    # Block below was removed, start falling again
-                    item['at_rest'] = False
-                    item['on_ground'] = False
-                    item['vel_y'] = 0
-                else:
-                    continue  # Skip physics update
-            
-            # Apply gravity
+            # Apply gravity only if not on ground
             if not item['on_ground']:
-                item['vel_y'] += 0.3
-                if item['vel_y'] > 8:
-                    item['vel_y'] = 8
+                item['vel_y'] += 0.5
+                if item['vel_y'] > 10:
+                    item['vel_y'] = 10
             
-            # Apply friction to horizontal movement
-            item['vel_x'] *= 0.98
-            
-            # Check if velocities are very small (item should come to rest)
-            if item['on_ground'] and abs(item['vel_x']) < 0.1 and abs(item['vel_y']) < 0.1:
+            # Stop horizontal movement when on ground (no sliding)
+            if item['on_ground']:
                 item['vel_x'] = 0
-                item['vel_y'] = 0
-                item['at_rest'] = True
-                continue
+            else:
+                # Apply air resistance to horizontal movement
+                item['vel_x'] *= 0.95
             
             # Move item
             new_x = item['x'] + item['vel_x']
@@ -401,8 +383,14 @@ class World:
                 item['on_ground'] = True
             else:
                 item['y'] = new_y
-                if item['vel_y'] > 0:  # Only set on_ground to False when falling
-                    item['on_ground'] = False
+                # Check if item should start falling (block below was removed)
+                if item['on_ground']:
+                    # Check if there's still a solid block below
+                    below_block_x = int(item['x'] // BLOCK_SIZE)
+                    below_block_y = int((item['y'] + 9) // BLOCK_SIZE)
+                    if not self.is_solid(below_block_x, below_block_y):
+                        item['on_ground'] = False
+                        item['vel_y'] = 0  # Start falling from rest
     
     def find_spawn_position(self):
         """Find a safe spawn position on the surface"""

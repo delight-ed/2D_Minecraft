@@ -3,32 +3,32 @@ from .constants import *
 # Crafting recipes - format: {result: (count, [(ingredient, count), ...], pattern)}
 CRAFTING_RECIPES = {
     # 2x2 recipes (basic crafting)
-    BLOCK_WOOD: {
-        'count': 4,
-        'ingredients': [(BLOCK_WOOD, 1)],
-        'pattern': [
-            [BLOCK_WOOD, None],
-            [None, None]
-        ],
-        'shapeless': True
-    },
-    
-    'stick': {
+    ITEM_STICK: {
         'count': 4,
         'ingredients': [(BLOCK_WOOD, 2)],
         'pattern': [
             [BLOCK_WOOD, None],
             [BLOCK_WOOD, None]
         ],
-        'shapeless': True
+        'shapeless': False
     },
     
-    'crafting_table': {
+    ITEM_CRAFTING_TABLE: {
         'count': 1,
         'ingredients': [(BLOCK_WOOD, 4)],
         'pattern': [
             [BLOCK_WOOD, BLOCK_WOOD],
             [BLOCK_WOOD, BLOCK_WOOD]
+        ],
+        'shapeless': False
+    },
+    
+    ITEM_WOODEN_PICKAXE: {
+        'count': 1,
+        'ingredients': [(BLOCK_WOOD, 3), (ITEM_STICK, 2)],
+        'pattern': [
+            [BLOCK_WOOD, BLOCK_WOOD],
+            [None, ITEM_STICK]
         ],
         'shapeless': False
     }
