@@ -1,5 +1,6 @@
 import pygame
 import math
+import os
 from .constants import *
 
 class Player:
@@ -34,18 +35,17 @@ class Player:
         # No starting items - player must gather everything!
     
     def load_player_textures(self):
-        """Load player textures from Minecraft assets"""
-        # Try to load Steve skin
-        steve_path = "game/assets/minecraft/textures/entity/player/wide/steve.png"
-        if os.path.exists(steve_path):
-            try:
-                self.player_skin = pygame.image.load(steve_path).convert_alpha()
+        """Load player textures from texture manager"""
+        try:
+            # Try to get Steve skin from texture manager
+            self.player_skin = self.texture_manager.get_player_texture()
+            if self.player_skin:
                 print("Loaded Steve skin texture")
-            except Exception as e:
-                print(f"Error loading Steve skin: {e}")
+            else:
+                print("Steve skin not found, using fallback")
                 self.player_skin = None
-        else:
-            print("Steve skin not found, using fallback")
+        except Exception as e:
+            print(f"Error loading Steve skin: {e}")
             self.player_skin = None
     
     def update(self, world):

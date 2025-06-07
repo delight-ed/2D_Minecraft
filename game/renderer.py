@@ -1,5 +1,6 @@
 import pygame
 from .constants import *
+from .utils import draw_text_with_shadow, get_block_name
 
 class Renderer:
     def __init__(self, screen, texture_manager):
@@ -147,22 +148,17 @@ class Renderer:
                     if block_type in player.inventory:
                         count = player.inventory[block_type]
                         if count > 1:
-                            count_text = self.small_font.render(str(count), True, WHITE)
-                            # Add text shadow
-                            shadow_text = self.small_font.render(str(count), True, BLACK)
-                            text_rect = count_text.get_rect()
-                            text_rect.bottomright = (slot_x + HOTBAR_SLOT_SIZE - 2, slot_y + HOTBAR_SLOT_SIZE - 2)
-                            shadow_rect = text_rect.copy()
-                            shadow_rect.x += 1
-                            shadow_rect.y += 1
-                            self.screen.blit(shadow_text, shadow_rect)
-                            self.screen.blit(count_text, text_rect)
+                            draw_text_with_shadow(
+                                self.screen, self.small_font, str(count),
+                                slot_x + HOTBAR_SLOT_SIZE - 15, slot_y + HOTBAR_SLOT_SIZE - 15,
+                                WHITE, BLACK
+                            )
             
             # Draw slot number
-            number_text = self.small_font.render(str(i + 1), True, WHITE)
-            shadow_text = self.small_font.render(str(i + 1), True, BLACK)
-            self.screen.blit(shadow_text, (slot_x + 3, slot_y - 17))
-            self.screen.blit(number_text, (slot_x + 2, slot_y - 18))
+            draw_text_with_shadow(
+                self.screen, self.small_font, str(i + 1),
+                slot_x + 2, slot_y - 18, WHITE, BLACK
+            )
     
     def draw_hotbar_icon(self, x, y, size, item_type):
         """Draw textured icons for hotbar"""
@@ -186,18 +182,27 @@ class Renderer:
         """Draw user interface"""
         # Draw coordinates with background
         coord_text = f"X: {int(player.x // BLOCK_SIZE)}, Y: {int(player.y // BLOCK_SIZE)}"
-        text_surface = self.font.render(coord_text, True, WHITE)
         
         # Background for coordinates
-        bg_rect = text_surface.get_rect()
-        bg_rect.x = 10
-        bg_rect.y = 10
+        coord_rect = draw_text_with_shadow(
+            self.screen, self.font, coord_text, 15, 13, WHITE, BLACK
+        )
+        
+        bg_rect = coord_rect.copy()
+        bg_rect.x -= 5
+        bg_rect.y -= 3
         bg_rect.width += 10
         bg_rect.height += 6
         
-        pygame.draw.rect(self.screen, (0, 0, 0, 150), bg_rect)
+        # Draw semi-transparent background
+        bg_surface = pygame.Surface((bg_rect.width, bg_rect.height))
+        bg_surface.set_alpha(150)
+        bg_surface.fill((0, 0, 0))
+        self.screen.blit(bg_surface, bg_rect)
         pygame.draw.rect(self.screen, WHITE, bg_rect, 1)
-        self.screen.blit(text_surface, (15, 13))
+        
+        # Redraw text on top
+        draw_text_with_shadow(self.screen, self.font, coord_text, 15, 13, WHITE, BLACK)
         
         # Draw controls with background
         controls = [
@@ -216,27 +221,17 @@ class Renderer:
         
         # Draw controls background
         controls_bg = pygame.Rect(10, SCREEN_HEIGHT - total_height - 10, max_width + 20, total_height)
-        pygame.draw.rect(self.screen, (0, 0, 0, 150), controls_bg)
+        bg_surface = pygame.Surface((controls_bg.width, controls_bg.height))
+        bg_surface.set_alpha(150)
+        bg_surface.fill((0, 0, 0))
+        self.screen.blit(bg_surface, controls_bg)
         pygame.draw.rect(self.screen, WHITE, controls_bg, 1)
         
         for i, control in enumerate(controls):
-            text = self.small_font.render(control, True, WHITE)
-            self.screen.blit(text, (20, SCREEN_HEIGHT - total_height + i * 22))
+            draw_text_with_shadow(
+                self.screen, self.small_font, control,
+                20, SCREEN_HEIGHT - total_height + i * 22, WHITE, BLACK
+            )
         
         # Draw hotbar
         self.draw_hotbar(player)
-    
-    def get_block_name(self, block_type):
-        """Get human-readable block name"""
-        names = {
-            BLOCK_DIRT: "Dirt",
-            BLOCK_GRASS: "Grass",
-            BLOCK_STONE: "Stone",
-            BLOCK_WATER: "Water",
-            BLOCK_SAND: "Sand",
-            BLOCK_WOOD: "Wood",
-            BLOCK_LEAVES: "Leaves",
-            BLOCK_COAL: "Coal",
-            BLOCK_IRON: "Iron"
-        }
-        return names.get(block_type, "Unknown")
