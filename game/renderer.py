@@ -39,11 +39,11 @@ class Renderer:
         self.draw_item_drops(world, camera)
     
     def draw_block_texture(self, x, y, block_type):
-        """Draw block using Minecraft textures"""
+        """Draw block using Minecraft textures with proper variants"""
         # Get appropriate texture variant for certain blocks
         variant = None
         if block_type == BLOCK_GRASS:
-            # Use side texture for grass blocks in 2D view
+            # Use side texture for grass blocks in 2D view (shows the grass on dirt)
             variant = "side"
         elif block_type == BLOCK_WOOD:
             # Use side texture for wood logs
@@ -139,7 +139,7 @@ class Renderer:
                 self.screen.blit(selection_surface, (screen_x, screen_y))
     
     def draw_block_breaking_animation(self, player, camera):
-        """Draw block breaking animation"""
+        """Draw block breaking animation using textures from ZIP"""
         if player.breaking_block is not None:
             world_x, world_y = player.breaking_block
             screen_x = world_x * BLOCK_SIZE - camera.x
@@ -153,6 +153,7 @@ class Renderer:
                 if stage >= 0:
                     breaking_texture = self.texture_manager.get_breaking_texture(stage)
                     if breaking_texture:
+                        # Draw the breaking texture overlay
                         self.screen.blit(breaking_texture, (screen_x, screen_y))
     
     def draw_hotbar(self, player):
@@ -257,9 +258,19 @@ class Renderer:
         # Redraw text on top
         draw_text_with_shadow(self.screen, self.font, coord_text, 15, 13, WHITE, BLACK)
         
+        # Draw movement state indicators
+        status_y = 50
+        if player.is_sprinting:
+            draw_text_with_shadow(self.screen, self.font, "SPRINTING", 15, status_y, YELLOW, BLACK)
+            status_y += 25
+        if player.is_crouching:
+            draw_text_with_shadow(self.screen, self.font, "CROUCHING", 15, status_y, LIGHT_GRAY, BLACK)
+            status_y += 25
+        
         # Draw controls with background
         controls = [
-            "WASD - Move | Space - Jump | E - Inventory",
+            "WASD - Move | Left Ctrl - Sprint | Left Shift - Crouch",
+            "Space - Jump | E - Inventory",
             "Left Click - Mine | Right Click - Place",
             "1-9 - Select Hotbar Slot | ESC - Menu"
         ]

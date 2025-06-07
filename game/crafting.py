@@ -23,11 +23,43 @@ CRAFTING_RECIPES = {
         'shapeless': False
     },
     
+    # Tools (2x2 crafting)
     ITEM_WOODEN_PICKAXE: {
         'count': 1,
         'ingredients': [(BLOCK_WOOD, 3), (ITEM_STICK, 2)],
         'pattern': [
             [BLOCK_WOOD, BLOCK_WOOD],
+            [None, ITEM_STICK]
+        ],
+        'shapeless': False
+    },
+    
+    ITEM_WOODEN_AXE: {
+        'count': 1,
+        'ingredients': [(BLOCK_WOOD, 3), (ITEM_STICK, 2)],
+        'pattern': [
+            [BLOCK_WOOD, BLOCK_WOOD],
+            [BLOCK_WOOD, ITEM_STICK]
+        ],
+        'shapeless': False
+    },
+    
+    ITEM_WOODEN_SHOVEL: {
+        'count': 1,
+        'ingredients': [(BLOCK_WOOD, 1), (ITEM_STICK, 2)],
+        'pattern': [
+            [BLOCK_WOOD, None],
+            [ITEM_STICK, None]
+        ],
+        'shapeless': False
+    },
+    
+    # Stone tools (requires crafting table - simplified for 2x2)
+    ITEM_STONE_PICKAXE: {
+        'count': 1,
+        'ingredients': [(BLOCK_STONE, 3), (ITEM_STICK, 2)],
+        'pattern': [
+            [BLOCK_STONE, BLOCK_STONE],
             [None, ITEM_STICK]
         ],
         'shapeless': False
@@ -81,24 +113,39 @@ class CraftingSystem:
         """Check if patterns match (with rotation and mirroring for shaped recipes)"""
         def normalize_pattern(pattern):
             """Remove empty rows and columns from pattern"""
-            # Remove empty rows
-            pattern = [row for row in pattern if any(cell is not None for cell in row)]
+            # Remove empty rows from top and bottom
+            while pattern and all(cell is None for cell in pattern[0]):
+                pattern = pattern[1:]
+            while pattern and all(cell is None for cell in pattern[-1]):
+                pattern = pattern[:-1]
+            
             if not pattern:
                 return []
             
-            # Remove empty columns
+            # Remove empty columns from left and right
             max_cols = len(pattern[0])
-            non_empty_cols = []
+            
+            # Find first non-empty column
+            first_col = max_cols
             for col in range(max_cols):
                 if any(row[col] is not None for row in pattern if col < len(row)):
-                    non_empty_cols.append(col)
+                    first_col = col
+                    break
             
-            if not non_empty_cols:
+            # Find last non-empty column
+            last_col = -1
+            for col in range(max_cols - 1, -1, -1):
+                if any(row[col] is not None for row in pattern if col < len(row)):
+                    last_col = col
+                    break
+            
+            if first_col > last_col:
                 return []
             
+            # Extract the non-empty region
             normalized = []
             for row in pattern:
-                new_row = [row[col] for col in non_empty_cols if col < len(row)]
+                new_row = row[first_col:last_col + 1]
                 normalized.append(new_row)
             
             return normalized
@@ -119,20 +166,22 @@ class CraftingSystem:
             return [row[::-1] for row in pattern]
         
         # Normalize both patterns
-        norm_recipe = normalize_pattern(recipe_pattern)
-        norm_grid = normalize_pattern(grid_pattern)
+        norm_recipe = normalize_pattern([row[:] for row in recipe_pattern])
+        norm_grid = normalize_pattern([row[:] for row in grid_pattern])
         
+        if not norm_recipe and not norm_grid:
+            return True
         if not norm_recipe or not norm_grid:
-            return norm_recipe == norm_grid
+            return False
         
         # Try all rotations and mirrors
         patterns_to_try = [norm_recipe]
         
         # Add rotations
-        current = norm_recipe
+        current = [row[:] for row in norm_recipe]
         for _ in range(3):
             current = rotate_pattern(current)
-            patterns_to_try.append(current)
+            patterns_to_try.append([row[:] for row in current])
         
         # Add mirrored versions
         mirrored_patterns = []
@@ -208,22 +257,35 @@ class CraftingSystem:
         result_item, result_count = self.result
         recipe_data = CRAFTING_RECIPES[result_item]
         
-        # Check if player has all ingredients in inventory
+        # Check if we have enough items in the crafting grid
         for req_item, req_count in recipe_data['ingredients']:
-            if req_item not in player_inventory or player_inventory[req_item] < req_count:
+            grid_count = 0
+            for i in range(2):
+                for j in range(2):
+                    item = self.crafting_grid[i][j]
+                    if item and item[0] == req_item:
+                        grid_count += item[1]
+            
+            if grid_count < req_count:
                 return False
         
         # Remove ingredients from crafting grid
-        for i in range(2):
-            for j in range(2):
-                item = self.crafting_grid[i][j]
-                if item:
-                    item_type, count = item
-                    new_count = count - 1
-                    if new_count > 0:
-                        self.crafting_grid[i][j] = (item_type, new_count)
-                    else:
-                        self.crafting_grid[i][j] = None
+        for req_item, req_count in recipe_data['ingredients']:
+            remaining_to_remove = req_count
+            for i in range(2):
+                for j in range(2):
+                    if remaining_to_remove <= 0:
+                        break
+                    item = self.crafting_grid[i][j]
+                    if item and item[0] == req_item:
+                        remove_count = min(remaining_to_remove, item[1])
+                        new_count = item[1] - remove_count
+                        remaining_to_remove -= remove_count
+                        
+                        if new_count > 0:
+                            self.crafting_grid[i][j] = (item[0], new_count)
+                        else:
+                            self.crafting_grid[i][j] = None
         
         # Add result to player inventory
         if result_item in player_inventory:

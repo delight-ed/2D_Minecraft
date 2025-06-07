@@ -11,14 +11,20 @@ class Player:
         self.height = BLOCK_SIZE * 2 - 8
         self.vel_x = 0
         self.vel_y = 0
-        self.speed = 6
-        # Minecraft player can jump exactly 1.25 blocks high
-        # With 32px blocks, that's 40 pixels total jump height
-        # Using physics: v² = u² + 2as, where s = 40, a = 0.8 (gravity)
-        # So u = sqrt(2 * 0.8 * 40) = sqrt(64) = 8
-        self.jump_power = 8.0  # Exactly 1.25 blocks with gravity 0.8
-        self.gravity = 0.8
+        
+        # Movement states
+        self.is_sprinting = False
+        self.is_crouching = False
         self.on_ground = False
+        
+        # Movement speeds
+        self.walk_speed = PLAYER_WALK_SPEED
+        self.sprint_speed = PLAYER_SPRINT_SPEED
+        self.crouch_speed = PLAYER_CROUCH_SPEED
+        self.jump_power = PLAYER_JUMP_POWER
+        self.gravity = PLAYER_GRAVITY
+        self.max_fall_speed = PLAYER_MAX_FALL_SPEED
+        
         self.keybinds = keybinds
         self.texture_manager = texture_manager
         
@@ -35,7 +41,7 @@ class Player:
         self.breaking_block = None  # (x, y) of block being broken
         self.breaking_progress = 0  # 0-100
         self.breaking_time = 0  # Time spent breaking current block
-        self.break_speed = 2.0  # Progress per frame when mining
+        self.break_speed = 1.5  # Progress per frame when mining (slower)
         
         # Load player textures
         self.load_player_textures()
@@ -62,8 +68,8 @@ class Player:
         self.vel_y += self.gravity
         
         # Limit fall speed
-        if self.vel_y > 20:
-            self.vel_y = 20
+        if self.vel_y > self.max_fall_speed:
+            self.vel_y = self.max_fall_speed
         
         # Move horizontally with better collision
         new_x = self.x + self.vel_x
@@ -94,14 +100,19 @@ class Player:
     
     def check_collision_horizontal(self, world, x, y):
         """Check horizontal collision with better precision"""
+        # Adjust height when crouching
+        height = self.height
+        if self.is_crouching:
+            height = int(self.height * 0.8)  # 20% shorter when crouching
+        
         # Check multiple points along the player's height
         check_points = [
             (x + 2, y + 2),                    # Top-left
             (x + self.width - 2, y + 2),       # Top-right
-            (x + 2, y + self.height // 2),     # Middle-left
-            (x + self.width - 2, y + self.height // 2),  # Middle-right
-            (x + 2, y + self.height - 2),      # Bottom-left
-            (x + self.width - 2, y + self.height - 2)    # Bottom-right
+            (x + 2, y + height // 2),          # Middle-left
+            (x + self.width - 2, y + height // 2),  # Middle-right
+            (x + 2, y + height - 2),           # Bottom-left
+            (x + self.width - 2, y + height - 2)    # Bottom-right
         ]
         
         for point_x, point_y in check_points:
@@ -113,14 +124,19 @@ class Player:
     
     def check_collision_vertical(self, world, x, y):
         """Check vertical collision with better precision"""
+        # Adjust height when crouching
+        height = self.height
+        if self.is_crouching:
+            height = int(self.height * 0.8)  # 20% shorter when crouching
+        
         # Check multiple points along the player's width
         check_points = [
             (x + 2, y + 2),                    # Top-left
             (x + self.width // 2, y + 2),      # Top-center
             (x + self.width - 2, y + 2),       # Top-right
-            (x + 2, y + self.height - 2),      # Bottom-left
-            (x + self.width // 2, y + self.height - 2),  # Bottom-center
-            (x + self.width - 2, y + self.height - 2)    # Bottom-right
+            (x + 2, y + height - 2),           # Bottom-left
+            (x + self.width // 2, y + height - 2),  # Bottom-center
+            (x + self.width - 2, y + height - 2)    # Bottom-right
         ]
         
         for point_x, point_y in check_points:
@@ -139,15 +155,33 @@ class Player:
             key_name = self.keybinds.get(keybind_name, '')
             if key_name == 'space':
                 return keys[pygame.K_SPACE]
+            elif key_name == 'left_ctrl':
+                return keys[pygame.K_LCTRL]
+            elif key_name == 'left_shift':
+                return keys[pygame.K_LSHIFT]
             elif len(key_name) == 1:
                 return keys[getattr(pygame, f'K_{key_name}', pygame.K_UNKNOWN)]
             return False
         
+        # Check movement states
+        self.is_sprinting = get_key_pressed('sprint') and self.on_ground
+        self.is_crouching = get_key_pressed('crouch')
+        
+        # Determine current speed
+        current_speed = self.walk_speed
+        if self.is_crouching:
+            current_speed = self.crouch_speed
+        elif self.is_sprinting:
+            current_speed = self.sprint_speed
+        
+        # Handle movement
         if get_key_pressed('move_left'):
-            self.vel_x = -self.speed
+            self.vel_x = -current_speed
         if get_key_pressed('move_right'):
-            self.vel_x = self.speed
-        if get_key_pressed('jump') and self.on_ground:
+            self.vel_x = current_speed
+        
+        # Handle jumping (can't jump while crouching)
+        if get_key_pressed('jump') and self.on_ground and not self.is_crouching:
             self.vel_y = -self.jump_power
     
     def select_hotbar_slot(self, slot):
@@ -413,16 +447,22 @@ class Player:
         screen_x = self.x - camera_x
         screen_y = self.y - camera_y
         
+        # Adjust height when crouching
+        draw_height = self.height
+        if self.is_crouching:
+            draw_height = int(self.height * 0.8)
+            screen_y += self.height - draw_height  # Move down when crouching
+        
         # Only draw if player is on screen
-        if (-self.width <= screen_x <= SCREEN_WIDTH and -self.height <= screen_y <= SCREEN_HEIGHT):
+        if (-self.width <= screen_x <= SCREEN_WIDTH and -draw_height <= screen_y <= SCREEN_HEIGHT):
             if self.player_skin:
                 # Extract parts from Steve skin texture for 2D representation
-                self.draw_steve_2d(screen, screen_x, screen_y)
+                self.draw_steve_2d(screen, screen_x, screen_y, draw_height)
             else:
                 # Fallback to original 8-bit style
-                self.draw_fallback_player(screen, screen_x, screen_y)
+                self.draw_fallback_player(screen, screen_x, screen_y, draw_height)
     
-    def draw_steve_2d(self, screen, screen_x, screen_y):
+    def draw_steve_2d(self, screen, screen_x, screen_y, draw_height):
         """Draw 2D representation of Steve using Minecraft skin texture"""
         try:
             # Steve skin is 64x64, we need to extract the front face parts
@@ -433,10 +473,10 @@ class Player:
             
             # Scale factor to fit our player size
             scale_x = self.width / 8  # 8 pixels wide in texture
-            scale_y = self.height / 20  # Approximate total height
+            scale_y = draw_height / 20  # Approximate total height
             
             # Head (top quarter of player)
-            head_height = self.height // 4
+            head_height = draw_height // 4
             head_rect = pygame.Rect(screen_x, screen_y, self.width, head_height)
             
             # Extract and scale head texture
@@ -445,7 +485,7 @@ class Player:
             screen.blit(head_scaled, head_rect)
             
             # Body (middle portion)
-            body_height = self.height // 2
+            body_height = draw_height // 2
             body_rect = pygame.Rect(screen_x, screen_y + head_height, self.width, body_height)
             
             # Extract and scale body texture
@@ -454,7 +494,7 @@ class Player:
             screen.blit(body_scaled, body_rect)
             
             # Legs (bottom quarter)
-            legs_height = self.height // 4
+            legs_height = draw_height // 4
             legs_rect = pygame.Rect(screen_x, screen_y + head_height + body_height, self.width, legs_height)
             
             # Extract and scale leg texture
@@ -478,24 +518,24 @@ class Player:
         except Exception as e:
             print(f"Error drawing Steve texture: {e}")
             # Fall back to simple rendering
-            self.draw_fallback_player(screen, screen_x, screen_y)
+            self.draw_fallback_player(screen, screen_x, screen_y, draw_height)
     
-    def draw_fallback_player(self, screen, screen_x, screen_y):
+    def draw_fallback_player(self, screen, screen_x, screen_y, draw_height):
         """Draw player with 8-bit style (fallback)"""
         # Draw player body with 8-bit style
-        body_rect = pygame.Rect(screen_x, screen_y, self.width, self.height)
+        body_rect = pygame.Rect(screen_x, screen_y, self.width, draw_height)
         
         # Main body color (blue shirt)
         pygame.draw.rect(screen, (0, 100, 200), body_rect)
         
         # Head (top quarter)
-        head_height = self.height // 4
+        head_height = draw_height // 4
         head_rect = pygame.Rect(screen_x, screen_y, self.width, head_height)
         pygame.draw.rect(screen, (255, 220, 177), head_rect)  # Skin color
         
         # Pants (bottom half)
-        pants_height = self.height // 2
-        pants_rect = pygame.Rect(screen_x, screen_y + self.height - pants_height, self.width, pants_height)
+        pants_height = draw_height // 2
+        pants_rect = pygame.Rect(screen_x, screen_y + draw_height - pants_height, self.width, pants_height)
         pygame.draw.rect(screen, (50, 50, 150), pants_rect)  # Dark blue pants
         
         # Body outline
@@ -513,10 +553,23 @@ class Player:
         
         # Arms (simple rectangles on sides)
         arm_width = 4
-        arm_height = self.height // 3
+        arm_height = draw_height // 3
         # Left arm
         pygame.draw.rect(screen, (255, 220, 177), (screen_x - arm_width, screen_y + head_height, arm_width, arm_height))
         pygame.draw.rect(screen, BLACK, (screen_x - arm_width, screen_y + head_height, arm_width, arm_height), 1)
         # Right arm
         pygame.draw.rect(screen, (255, 220, 177), (screen_x + self.width, screen_y + head_height, arm_width, arm_height))
         pygame.draw.rect(screen, BLACK, (screen_x + self.width, screen_y + head_height, arm_width, arm_height), 1)
+        
+        # Draw movement state indicators
+        if self.is_sprinting:
+            # Sprint indicator (small lines behind player)
+            for i in range(3):
+                line_x = screen_x - 8 - i * 3
+                line_y = screen_y + draw_height // 2 + i * 2
+                pygame.draw.line(screen, (255, 255, 255), 
+                               (line_x, line_y), (line_x + 4, line_y), 1)
+        
+        if self.is_crouching:
+            # Crouch indicator (slightly different color)
+            pygame.draw.rect(screen, (200, 200, 200), body_rect, 1)

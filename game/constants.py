@@ -53,12 +53,18 @@ BLOCK_COLORS = {
 ITEM_STICK = "stick"
 ITEM_CRAFTING_TABLE = "crafting_table"
 ITEM_WOODEN_PICKAXE = "wooden_pickaxe"
+ITEM_STONE_PICKAXE = "stone_pickaxe"
+ITEM_WOODEN_AXE = "wooden_axe"
+ITEM_WOODEN_SHOVEL = "wooden_shovel"
 
 # Item colors for rendering
 ITEM_COLORS = {
     ITEM_STICK: (139, 90, 43),
     ITEM_CRAFTING_TABLE: (160, 82, 45),
-    ITEM_WOODEN_PICKAXE: (139, 90, 43)
+    ITEM_WOODEN_PICKAXE: (139, 90, 43),
+    ITEM_STONE_PICKAXE: (105, 105, 105),
+    ITEM_WOODEN_AXE: (139, 90, 43),
+    ITEM_WOODEN_SHOVEL: (139, 90, 43)
 }
 
 # World settings
@@ -68,22 +74,26 @@ SURFACE_LEVEL = 80
 CHUNK_SIZE = 16  # Blocks per chunk
 RENDER_DISTANCE = 8  # Chunks to render around player
 
-# Biome types
-BIOME_PLAINS = 0
-BIOME_FOREST = 1
-BIOME_DESERT = 2
-BIOME_MOUNTAINS = 3
-
 # Hotbar settings
 HOTBAR_SIZE = 9
 HOTBAR_SLOT_SIZE = 50
 HOTBAR_MARGIN = 10
+
+# Player movement constants (more realistic Minecraft-like values)
+PLAYER_WALK_SPEED = 3.0      # Normal walking speed
+PLAYER_SPRINT_SPEED = 5.0    # Sprinting speed (1.67x walk speed)
+PLAYER_CROUCH_SPEED = 1.0    # Crouching speed (0.33x walk speed)
+PLAYER_JUMP_POWER = 6.5      # Jump height (exactly 1.25 blocks)
+PLAYER_GRAVITY = 0.5         # Gravity acceleration
+PLAYER_MAX_FALL_SPEED = 15   # Terminal velocity
 
 # Default keybinds
 DEFAULT_KEYBINDS = {
     'move_left': 'a',
     'move_right': 'd',
     'jump': 'space',
+    'sprint': 'left_ctrl',
+    'crouch': 'left_shift',
     'inventory': 'e',
     'mine': 'left_click',
     'place': 'right_click'

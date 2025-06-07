@@ -122,6 +122,10 @@ class SettingsMenu:
                 key_name = pygame.key.name(event.key)
                 if key_name == 'space':
                     key_name = 'space'
+                elif key_name == 'left ctrl':
+                    key_name = 'left_ctrl'
+                elif key_name == 'left shift':
+                    key_name = 'left_shift'
                 elif key_name == 'escape':
                     self.waiting_for_key = False
                     return None

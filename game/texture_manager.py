@@ -72,6 +72,9 @@ class TextureManager:
                 # Load special textures
                 self.load_special_textures_from_zip(zip_file, file_list)
                 
+                # Load breaking animation textures
+                self.load_breaking_textures_from_zip(zip_file, file_list)
+                
                 # Load player skin
                 self.load_player_skin_from_zip(zip_file, file_list)
                 
@@ -141,6 +144,53 @@ class TextureManager:
         self.create_fallback_texture(item_id)
         return False
     
+    def load_breaking_textures_from_zip(self, zip_file, file_list):
+        """Load breaking animation textures from ZIP file"""
+        self.breaking_textures = {}
+        
+        # Try to load destroy stage textures from the ZIP
+        for stage in range(10):
+            stage_names = [
+                f"destroy_stage_{stage}",
+                f"destroy_{stage}",
+                f"breaking_{stage}",
+                f"crack_{stage}"
+            ]
+            
+            for stage_name in stage_names:
+                possible_paths = [
+                    f"assets/minecraft/textures/block/{stage_name}.png",
+                    f"minecraft/textures/block/{stage_name}.png",
+                    f"textures/block/{stage_name}.png",
+                    f"block/{stage_name}.png",
+                    f"{stage_name}.png",
+                    f"assets/minecraft/textures/blocks/{stage_name}.png"  # Legacy
+                ]
+                
+                loaded = False
+                for path in possible_paths:
+                    if path in file_list:
+                        try:
+                            import io
+                            texture_data = zip_file.read(path)
+                            texture_file = io.BytesIO(texture_data)
+                            original = pygame.image.load(texture_file).convert_alpha()
+                            scaled = pygame.transform.scale(original, (self.block_size, self.block_size))
+                            self.breaking_textures[stage] = scaled
+                            print(f"Loaded breaking stage {stage} from {path}")
+                            loaded = True
+                            break
+                        except Exception as e:
+                            print(f"Error loading breaking texture {path}: {e}")
+                
+                if loaded:
+                    break
+        
+        # If we couldn't load breaking textures from ZIP, create fallback ones
+        if not self.breaking_textures:
+            print("Creating fallback breaking animation textures")
+            self.create_breaking_animation_textures()
+    
     def load_special_textures_from_zip(self, zip_file, file_list):
         """Load special texture variants from ZIP"""
         # Grass block side texture
@@ -186,6 +236,28 @@ class TextureManager:
                     break
                 except Exception as e:
                     print(f"Error loading wood side texture: {e}")
+        
+        # Grass block top texture
+        grass_top_paths = [
+            "assets/minecraft/textures/block/grass_block_top.png",
+            "minecraft/textures/block/grass_block_top.png",
+            "textures/block/grass_block_top.png",
+            "block/grass_block_top.png",
+            "assets/minecraft/textures/blocks/grass_top.png"  # Legacy
+        ]
+        
+        for path in grass_top_paths:
+            if path in file_list:
+                try:
+                    import io
+                    texture_data = zip_file.read(path)
+                    texture_file = io.BytesIO(texture_data)
+                    original = pygame.image.load(texture_file).convert_alpha()
+                    self.textures[f"{BLOCK_GRASS}_top"] = pygame.transform.scale(original, (self.block_size, self.block_size))
+                    print("Loaded grass top texture")
+                    break
+                except Exception as e:
+                    print(f"Error loading grass top texture: {e}")
     
     def load_player_skin_from_zip(self, zip_file, file_list):
         """Load player skin from ZIP file"""
@@ -218,6 +290,9 @@ class TextureManager:
         """Create fallback textures for all items"""
         for item_id in self.block_mappings.keys():
             self.create_fallback_texture(item_id)
+        
+        # Create fallback breaking textures
+        self.create_breaking_animation_textures()
     
     def create_fallback_texture(self, item_type):
         """Create a fallback texture if the original can't be loaded"""
@@ -270,33 +345,47 @@ class TextureManager:
     
     def create_breaking_animation_textures(self):
         """Create block breaking animation textures"""
-        breaking_textures = {}
+        if not hasattr(self, 'breaking_textures'):
+            self.breaking_textures = {}
         
-        # Create 10 stages of breaking animation
+        # Create 10 stages of breaking animation if not loaded from ZIP
         for stage in range(10):
-            surface = pygame.Surface((self.block_size, self.block_size), pygame.SRCALPHA)
-            
-            # Create crack pattern that gets more intense
-            crack_intensity = (stage + 1) / 10.0
-            crack_color = (255, 255, 255, int(100 * crack_intensity))
-            
-            # Draw crack lines
-            for i in range(int(5 * crack_intensity)):
-                start_x = int(self.block_size * (i / (5 * crack_intensity)))
-                start_y = 0
-                end_x = int(self.block_size * ((i + 1) / (5 * crack_intensity)))
-                end_y = self.block_size
+            if stage not in self.breaking_textures:
+                surface = pygame.Surface((self.block_size, self.block_size), pygame.SRCALPHA)
                 
-                pygame.draw.line(surface, crack_color, (start_x, start_y), (end_x, end_y), 2)
-                pygame.draw.line(surface, crack_color, (start_x, end_y), (end_x, start_y), 2)
-            
-            breaking_textures[stage] = surface
-        
-        return breaking_textures
+                # Create crack pattern that gets more intense
+                crack_intensity = (stage + 1) / 10.0
+                crack_color = (0, 0, 0, int(150 * crack_intensity))
+                
+                # Draw crack lines in a more realistic pattern
+                num_cracks = int(3 + stage * 0.7)
+                for i in range(num_cracks):
+                    # Vertical cracks
+                    x = int(self.block_size * (i + 0.5) / num_cracks)
+                    pygame.draw.line(surface, crack_color, 
+                                   (x, 0), (x, self.block_size), 
+                                   max(1, int(2 * crack_intensity)))
+                    
+                    # Horizontal cracks
+                    y = int(self.block_size * (i + 0.5) / num_cracks)
+                    pygame.draw.line(surface, crack_color, 
+                                   (0, y), (self.block_size, y), 
+                                   max(1, int(2 * crack_intensity)))
+                    
+                    # Diagonal cracks for later stages
+                    if stage > 5:
+                        pygame.draw.line(surface, crack_color,
+                                       (0, 0), (self.block_size, self.block_size),
+                                       max(1, int(crack_intensity)))
+                        pygame.draw.line(surface, crack_color,
+                                       (self.block_size, 0), (0, self.block_size),
+                                       max(1, int(crack_intensity)))
+                
+                self.breaking_textures[stage] = surface
     
     def get_breaking_texture(self, stage):
         """Get breaking animation texture for given stage (0-9)"""
         if not hasattr(self, 'breaking_textures'):
-            self.breaking_textures = self.create_breaking_animation_textures()
+            self.create_breaking_animation_textures()
         
         return self.breaking_textures.get(stage, None)
