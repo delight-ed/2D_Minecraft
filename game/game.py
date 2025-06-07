@@ -1,5 +1,7 @@
 import pygame
 import sys
+import json
+import os
 from .constants import *
 from .world import World
 from .player import Player
@@ -19,8 +21,11 @@ class Game:
         self.state = STATE_MENU
         self.running = True
         
-        # Keybinds
-        self.keybinds = DEFAULT_KEYBINDS.copy()
+        # Settings file path
+        self.settings_file = "settings.json"
+        
+        # Load settings
+        self.keybinds = self.load_settings()
         
         # Menu system
         self.main_menu = MainMenu(self.screen)
@@ -34,6 +39,33 @@ class Game:
         self.inventory_gui = None
         
         print("Game initialized!")
+    
+    def load_settings(self):
+        """Load settings from file"""
+        if os.path.exists(self.settings_file):
+            try:
+                with open(self.settings_file, 'r') as f:
+                    settings = json.load(f)
+                    keybinds = settings.get('keybinds', DEFAULT_KEYBINDS.copy())
+                    print("Settings loaded successfully!")
+                    return keybinds
+            except Exception as e:
+                print(f"Error loading settings: {e}")
+        
+        # Return default settings if file doesn't exist or error occurred
+        return DEFAULT_KEYBINDS.copy()
+    
+    def save_settings(self):
+        """Save settings to file"""
+        try:
+            settings = {
+                'keybinds': self.keybinds
+            }
+            with open(self.settings_file, 'w') as f:
+                json.dump(settings, f, indent=2)
+            print("Settings saved successfully!")
+        except Exception as e:
+            print(f"Error saving settings: {e}")
     
     def init_game_world(self):
         """Initialize the game world and objects"""
@@ -76,6 +108,7 @@ class Game:
             action = self.settings_menu.handle_event(event)
             if action == 'back':
                 self.keybinds = self.settings_menu.get_keybinds()
+                self.save_settings()  # Save settings when leaving settings menu
                 self.state = STATE_MENU
     
     def handle_game_events(self):
@@ -99,6 +132,9 @@ class Game:
                     if self.inventory_gui.is_open:
                         self.inventory_gui.toggle()
                     else:
+                        # Save world before returning to menu
+                        if self.world:
+                            self.world.cleanup()
                         self.state = STATE_MENU
             
             elif event.type == pygame.MOUSEBUTTONDOWN:
@@ -177,6 +213,11 @@ class Game:
             
             pygame.display.flip()
             self.clock.tick(FPS)
+        
+        # Save world and settings before quitting
+        if self.world:
+            self.world.cleanup()
+        self.save_settings()
         
         pygame.quit()
         sys.exit()

@@ -1,5 +1,7 @@
 import random
 import noise
+import json
+import os
 from .constants import *
 
 class Chunk:
@@ -8,11 +10,15 @@ class Chunk:
         self.blocks = [[BLOCK_AIR for _ in range(WORLD_HEIGHT)] for _ in range(CHUNK_SIZE)]
         self.biomes = [BIOME_PLAINS for _ in range(CHUNK_SIZE)]
         self.generated = False
+        self.modified = False  # Track if chunk has been modified
     
     def generate(self, world_seed=0):
         """Generate this chunk"""
         if self.generated:
             return
+        
+        # Set random seed for consistent generation
+        random.seed(world_seed + self.chunk_x * 1000)
         
         # Generate biomes for this chunk
         for local_x in range(CHUNK_SIZE):
@@ -74,6 +80,9 @@ class Chunk:
         self.generate_structures()
         
         self.generated = True
+        
+        # Reset random seed
+        random.seed()
     
     def generate_ores(self):
         """Generate ore deposits in this chunk"""
@@ -153,27 +162,109 @@ class Chunk:
         """Set block at local position within chunk"""
         if 0 <= local_x < CHUNK_SIZE and 0 <= y < WORLD_HEIGHT:
             self.blocks[local_x][y] = block_type
+            self.modified = True  # Mark chunk as modified
             return True
         return False
+    
+    def to_dict(self):
+        """Convert chunk to dictionary for saving"""
+        return {
+            'chunk_x': self.chunk_x,
+            'blocks': self.blocks,
+            'biomes': self.biomes,
+            'generated': self.generated,
+            'modified': self.modified
+        }
+    
+    @classmethod
+    def from_dict(cls, data):
+        """Create chunk from dictionary"""
+        chunk = cls(data['chunk_x'])
+        chunk.blocks = data['blocks']
+        chunk.biomes = data['biomes']
+        chunk.generated = data['generated']
+        chunk.modified = data.get('modified', False)
+        return chunk
 
 
 class World:
-    def __init__(self, seed=None):
+    def __init__(self, seed=None, save_name="default"):
         self.seed = seed or random.randint(0, 1000000)
+        self.save_name = save_name
+        self.save_dir = f"saves/{save_name}"
+        
+        # Create save directory if it doesn't exist
+        os.makedirs(self.save_dir, exist_ok=True)
+        
         random.seed(self.seed)
         self.chunks = {}  # Dictionary of chunk_x -> Chunk
         self.item_drops = []  # List of item drops in the world
         
-        # Generate initial chunks around spawn
-        spawn_chunk = 0
-        for chunk_x in range(spawn_chunk - 2, spawn_chunk + 3):
-            self.load_chunk(chunk_x)
+        # Try to load existing world data
+        self.load_world_data()
+        
+        # Generate initial chunks around spawn if this is a new world
+        if not self.chunks:
+            spawn_chunk = 0
+            for chunk_x in range(spawn_chunk - 2, spawn_chunk + 3):
+                self.load_chunk(chunk_x)
+    
+    def save_world_data(self):
+        """Save world metadata"""
+        world_data = {
+            'seed': self.seed,
+            'save_name': self.save_name
+        }
+        
+        with open(f"{self.save_dir}/world.json", 'w') as f:
+            json.dump(world_data, f)
+    
+    def load_world_data(self):
+        """Load world metadata"""
+        world_file = f"{self.save_dir}/world.json"
+        if os.path.exists(world_file):
+            try:
+                with open(world_file, 'r') as f:
+                    world_data = json.load(f)
+                    self.seed = world_data.get('seed', self.seed)
+                    print(f"Loaded world with seed: {self.seed}")
+            except Exception as e:
+                print(f"Error loading world data: {e}")
+    
+    def save_chunk(self, chunk):
+        """Save a single chunk to disk"""
+        if chunk.modified:
+            chunk_file = f"{self.save_dir}/chunk_{chunk.chunk_x}.json"
+            try:
+                with open(chunk_file, 'w') as f:
+                    json.dump(chunk.to_dict(), f)
+                chunk.modified = False  # Reset modified flag after saving
+            except Exception as e:
+                print(f"Error saving chunk {chunk.chunk_x}: {e}")
+    
+    def load_chunk_from_disk(self, chunk_x):
+        """Load a chunk from disk"""
+        chunk_file = f"{self.save_dir}/chunk_{chunk_x}.json"
+        if os.path.exists(chunk_file):
+            try:
+                with open(chunk_file, 'r') as f:
+                    chunk_data = json.load(f)
+                    return Chunk.from_dict(chunk_data)
+            except Exception as e:
+                print(f"Error loading chunk {chunk_x}: {e}")
+        return None
     
     def load_chunk(self, chunk_x):
         """Load a chunk if it doesn't exist"""
         if chunk_x not in self.chunks:
-            chunk = Chunk(chunk_x)
-            chunk.generate(self.seed)
+            # Try to load from disk first
+            chunk = self.load_chunk_from_disk(chunk_x)
+            
+            if chunk is None:
+                # Generate new chunk if not found on disk
+                chunk = Chunk(chunk_x)
+                chunk.generate(self.seed)
+            
             self.chunks[chunk_x] = chunk
     
     def unload_distant_chunks(self, player_chunk_x):
@@ -184,6 +275,8 @@ class World:
                 chunks_to_unload.append(chunk_x)
         
         for chunk_x in chunks_to_unload:
+            # Save chunk before unloading if it was modified
+            self.save_chunk(self.chunks[chunk_x])
             del self.chunks[chunk_x]
     
     def ensure_chunks_loaded(self, player_x):
@@ -201,6 +294,9 @@ class World:
         """Convert world x coordinate to chunk coordinates"""
         chunk_x = world_x // CHUNK_SIZE
         local_x = world_x % CHUNK_SIZE
+        if world_x < 0 and local_x != 0:
+            chunk_x -= 1
+            local_x = CHUNK_SIZE + local_x
         return chunk_x, local_x
     
     def get_block(self, x, y):
@@ -327,3 +423,16 @@ class World:
     def get_loaded_chunks(self):
         """Get list of loaded chunk coordinates"""
         return list(self.chunks.keys())
+    
+    def save_all_chunks(self):
+        """Save all loaded chunks"""
+        for chunk in self.chunks.values():
+            self.save_chunk(chunk)
+        
+        # Save world metadata
+        self.save_world_data()
+    
+    def cleanup(self):
+        """Clean up world resources and save data"""
+        self.save_all_chunks()
+        print(f"World saved to {self.save_dir}")

@@ -11,7 +11,9 @@ class Player:
         self.vel_x = 0
         self.vel_y = 0
         self.speed = 6
-        self.jump_power = 16
+        # Minecraft player can jump 1.25 blocks high (1 block + 8 pixels)
+        # With 32px blocks, that's 40 pixels total jump height
+        self.jump_power = 14  # Reduced from 16 to match Minecraft jump height
         self.gravity = 0.8
         self.on_ground = False
         self.keybinds = keybinds

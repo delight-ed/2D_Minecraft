@@ -1,6 +1,6 @@
 import pygame
 from .constants import *
-from .crafting import CraftingSystem
+from .crafting import CraftingSystem, CRAFTING_RECIPES
 
 class InventoryGUI:
     def __init__(self, screen):
