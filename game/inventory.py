@@ -126,22 +126,53 @@ class InventoryGUI:
     
     def handle_result_click(self, player, offset_x, offset_y):
         """Handle clicks on crafting result"""
+        # Check if there's a valid result and no item currently selected
         if self.crafting_system.result and not self.selected_item:
+            result_item, result_count = self.crafting_system.result
+            
             # Check if we can craft (have ingredients in inventory)
-            recipe_data = CRAFTING_RECIPES.get(self.crafting_system.result[0])
+            recipe_data = CRAFTING_RECIPES.get(result_item)
             if recipe_data:
                 can_craft = True
                 for req_item, req_count in recipe_data['ingredients']:
-                    if req_item not in player.inventory or player.inventory[req_item] < req_count:
+                    # Check if we have enough items in the crafting grid
+                    grid_count = 0
+                    for i in range(2):
+                        for j in range(2):
+                            item = self.crafting_system.get_item(i, j)
+                            if item and item[0] == req_item:
+                                grid_count += item[1]
+                    
+                    if grid_count < req_count:
                         can_craft = False
                         break
                 
-                if can_craft and self.crafting_system.craft_item(player.inventory):
-                    # Successfully crafted
-                    result_item, result_count = self.crafting_system.result
+                if can_craft:
+                    # Remove ingredients from crafting grid
+                    for req_item, req_count in recipe_data['ingredients']:
+                        remaining_to_remove = req_count
+                        for i in range(2):
+                            for j in range(2):
+                                if remaining_to_remove <= 0:
+                                    break
+                                item = self.crafting_system.get_item(i, j)
+                                if item and item[0] == req_item:
+                                    remove_count = min(remaining_to_remove, item[1])
+                                    new_count = item[1] - remove_count
+                                    remaining_to_remove -= remove_count
+                                    
+                                    if new_count > 0:
+                                        self.crafting_system.set_item(i, j, item[0], new_count)
+                                    else:
+                                        self.crafting_system.set_item(i, j, None, 0)
+                    
+                    # Pick up the result
                     self.selected_item = (result_item, result_count)
                     self.drag_offset_x = offset_x
                     self.drag_offset_y = offset_y
+                    
+                    # Update the crafting result after removing ingredients
+                    self.crafting_system.update_result()
     
     def handle_inventory_click(self, row, col, player, offset_x, offset_y):
         """Handle clicks in inventory grid"""
