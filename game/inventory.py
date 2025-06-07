@@ -3,8 +3,9 @@ from .constants import *
 from .crafting import CraftingSystem, CRAFTING_RECIPES
 
 class InventoryGUI:
-    def __init__(self, screen):
+    def __init__(self, screen, texture_manager):
         self.screen = screen
+        self.texture_manager = texture_manager
         self.font = pygame.font.Font(None, 24)
         self.small_font = pygame.font.Font(None, 18)
         self.is_open = False
@@ -301,7 +302,7 @@ class InventoryGUI:
             self.selected_item = None
     
     def draw(self, player):
-        """Draw the inventory GUI"""
+        """Draw the inventory GUI with textured items"""
         if not self.is_open:
             return
         
@@ -428,26 +429,37 @@ class InventoryGUI:
                     self.draw_item_icon(slot_x + 2, slot_y + 2, item_type, count)
     
     def draw_item_icon(self, x, y, item_type, count, alpha=255):
-        """Draw an item icon with count and 8-bit textures"""
+        """Draw an item icon with count using Minecraft textures"""
         icon_size = self.slot_size - 4
         
-        # Create surface for alpha blending
-        icon_surface = pygame.Surface((icon_size, icon_size))
-        icon_surface.set_alpha(alpha)
+        # Get texture for item
+        texture = self.texture_manager.get_scaled_texture(item_type, icon_size)
         
-        # Get color for item
-        if item_type in BLOCK_COLORS:
-            color = BLOCK_COLORS[item_type]
-        elif item_type in ITEM_COLORS:
-            color = ITEM_COLORS[item_type]
+        if texture:
+            # Apply alpha if needed
+            if alpha < 255:
+                texture = texture.copy()
+                texture.set_alpha(alpha)
+            
+            self.screen.blit(texture, (x, y))
         else:
-            color = (200, 200, 200)  # Default gray
-        
-        if color:
-            # Draw 8-bit style texture
-            self.draw_8bit_texture(icon_surface, item_type, icon_size)
-        
-        self.screen.blit(icon_surface, (x, y))
+            # Fallback to color rendering
+            icon_surface = pygame.Surface((icon_size, icon_size))
+            icon_surface.set_alpha(alpha)
+            
+            # Get color for item
+            if item_type in BLOCK_COLORS:
+                color = BLOCK_COLORS[item_type]
+            elif item_type in ITEM_COLORS:
+                color = ITEM_COLORS[item_type]
+            else:
+                color = (200, 200, 200)  # Default gray
+            
+            if color:
+                icon_surface.fill(color)
+                pygame.draw.rect(icon_surface, BLACK, (0, 0, icon_size, icon_size), 1)
+            
+            self.screen.blit(icon_surface, (x, y))
         
         # Draw count
         if count > 1:
@@ -460,97 +472,3 @@ class InventoryGUI:
             text_rect = count_surface.get_rect()
             text_rect.bottomright = (x + icon_size - 2, y + icon_size - 2)
             self.screen.blit(count_surface, text_rect)
-    
-    def draw_8bit_texture(self, surface, item_type, size):
-        """Draw 8-bit style textures for items"""
-        if item_type == BLOCK_GRASS:
-            # Grass block - green top, brown sides
-            surface.fill((101, 67, 33))  # Brown base
-            pygame.draw.rect(surface, (34, 139, 34), (0, 0, size, size // 3))  # Green top
-            # Add some texture lines
-            for i in range(2, size, 4):
-                pygame.draw.line(surface, (20, 100, 20), (i, 0), (i, size // 3))
-        
-        elif item_type == BLOCK_DIRT:
-            # Dirt texture
-            surface.fill((101, 67, 33))
-            # Add dirt spots
-            for i in range(4, size, 8):
-                for j in range(4, size, 8):
-                    pygame.draw.rect(surface, (80, 50, 25), (i, j, 3, 3))
-        
-        elif item_type == BLOCK_STONE:
-            # Stone texture
-            surface.fill((105, 105, 105))
-            # Add stone pattern
-            for i in range(2, size, 6):
-                for j in range(2, size, 6):
-                    pygame.draw.rect(surface, (85, 85, 85), (i, j, 2, 2))
-        
-        elif item_type == BLOCK_WOOD:
-            # Wood texture
-            surface.fill((139, 90, 43))
-            # Add wood grain
-            for i in range(0, size, 2):
-                pygame.draw.line(surface, (120, 75, 35), (0, i), (size, i))
-        
-        elif item_type == BLOCK_LEAVES:
-            # Leaves texture
-            surface.fill((0, 100, 0))
-            # Add leaf pattern
-            for i in range(1, size, 4):
-                for j in range(1, size, 4):
-                    if (i + j) % 8 < 4:
-                        pygame.draw.rect(surface, (0, 120, 0), (i, j, 2, 2))
-        
-        elif item_type == ITEM_STICK:
-            # Stick texture - vertical brown rectangle
-            surface.fill((0, 0, 0, 0))  # Transparent background
-            stick_width = size // 4
-            stick_x = (size - stick_width) // 2
-            pygame.draw.rect(surface, (139, 90, 43), (stick_x, 2, stick_width, size - 4))
-            pygame.draw.rect(surface, (100, 65, 30), (stick_x, 2, 1, size - 4))  # Shadow
-        
-        elif item_type == ITEM_CRAFTING_TABLE:
-            # Crafting table texture
-            surface.fill((160, 82, 45))
-            # Add crafting table pattern
-            pygame.draw.rect(surface, (180, 100, 60), (2, 2, size - 4, size - 4))
-            pygame.draw.line(surface, (100, 50, 25), (size//2, 2), (size//2, size - 2))
-            pygame.draw.line(surface, (100, 50, 25), (2, size//2), (size - 2, size//2))
-        
-        elif item_type == ITEM_WOODEN_PICKAXE:
-            # Wooden pickaxe texture
-            surface.fill((0, 0, 0, 0))  # Transparent background
-            # Handle
-            handle_width = size // 6
-            handle_x = (size - handle_width) // 2
-            pygame.draw.rect(surface, (139, 90, 43), (handle_x, size//2, handle_width, size//2))
-            # Pickaxe head
-            head_height = size // 3
-            pygame.draw.rect(surface, (120, 75, 35), (2, size//4, size - 4, head_height))
-            # Pickaxe points
-            pygame.draw.polygon(surface, (100, 65, 30), [
-                (2, size//4 + head_height//2),
-                (0, size//4 + head_height//2 - 3),
-                (0, size//4 + head_height//2 + 3)
-            ])
-            pygame.draw.polygon(surface, (100, 65, 30), [
-                (size - 2, size//4 + head_height//2),
-                (size, size//4 + head_height//2 - 3),
-                (size, size//4 + head_height//2 + 3)
-            ])
-        
-        else:
-            # Default texture for unknown items
-            if item_type in BLOCK_COLORS:
-                color = BLOCK_COLORS[item_type]
-            elif item_type in ITEM_COLORS:
-                color = ITEM_COLORS[item_type]
-            else:
-                color = (200, 200, 200)
-            
-            surface.fill(color)
-        
-        # Add border
-        pygame.draw.rect(surface, BLACK, (0, 0, size, size), 1)

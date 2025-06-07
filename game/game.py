@@ -9,6 +9,7 @@ from .camera import Camera
 from .renderer import Renderer
 from .inventory import InventoryGUI
 from .menu import MainMenu, SettingsMenu
+from .texture_manager import TextureManager
 
 class Game:
     def __init__(self):
@@ -26,6 +27,9 @@ class Game:
         
         # Load settings
         self.keybinds = self.load_settings()
+        
+        # Initialize texture manager
+        self.texture_manager = TextureManager()
         
         # Menu system
         self.main_menu = MainMenu(self.screen)
@@ -77,10 +81,10 @@ class Game:
         spawn_x, spawn_y = self.world.find_spawn_position()
         print(f"Spawn position: {spawn_x}, {spawn_y}")
         
-        self.player = Player(spawn_x, spawn_y, self.keybinds)
+        self.player = Player(spawn_x, spawn_y, self.keybinds, self.texture_manager)
         self.camera = Camera()
-        self.renderer = Renderer(self.screen)
-        self.inventory_gui = InventoryGUI(self.screen)
+        self.renderer = Renderer(self.screen, self.texture_manager)
+        self.inventory_gui = InventoryGUI(self.screen, self.texture_manager)
         
         print("Game world initialized!")
     

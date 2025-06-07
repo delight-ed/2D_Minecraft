@@ -3,7 +3,7 @@ import math
 from .constants import *
 
 class Player:
-    def __init__(self, x, y, keybinds):
+    def __init__(self, x, y, keybinds, texture_manager):
         self.x = x
         self.y = y
         self.width = BLOCK_SIZE - 8
@@ -17,6 +17,7 @@ class Player:
         self.gravity = 0.8
         self.on_ground = False
         self.keybinds = keybinds
+        self.texture_manager = texture_manager
         
         # Empty hotbar - player starts with nothing!
         self.hotbar = [BLOCK_AIR for _ in range(HOTBAR_SIZE)]
@@ -27,7 +28,25 @@ class Player:
         self.current_tool = None
         self.can_mine_stone = False
         
+        # Load player textures
+        self.load_player_textures()
+        
         # No starting items - player must gather everything!
+    
+    def load_player_textures(self):
+        """Load player textures from Minecraft assets"""
+        # Try to load Steve skin
+        steve_path = "game/assets/minecraft/textures/entity/player/wide/steve.png"
+        if os.path.exists(steve_path):
+            try:
+                self.player_skin = pygame.image.load(steve_path).convert_alpha()
+                print("Loaded Steve skin texture")
+            except Exception as e:
+                print(f"Error loading Steve skin: {e}")
+                self.player_skin = None
+        else:
+            print("Steve skin not found, using fallback")
+            self.player_skin = None
     
     def update(self, world):
         """Update player physics and position"""
@@ -331,47 +350,114 @@ class Player:
                 world.item_drops.remove(item)
     
     def draw(self, screen, camera_x, camera_y):
-        """Draw player with 8-bit style"""
+        """Draw player with Minecraft Steve texture or fallback"""
         screen_x = self.x - camera_x
         screen_y = self.y - camera_y
         
         # Only draw if player is on screen
         if (-self.width <= screen_x <= SCREEN_WIDTH and -self.height <= screen_y <= SCREEN_HEIGHT):
-            # Draw player body with 8-bit style
-            body_rect = pygame.Rect(screen_x, screen_y, self.width, self.height)
+            if self.player_skin:
+                # Extract parts from Steve skin texture for 2D representation
+                self.draw_steve_2d(screen, screen_x, screen_y)
+            else:
+                # Fallback to original 8-bit style
+                self.draw_fallback_player(screen, screen_x, screen_y)
+    
+    def draw_steve_2d(self, screen, screen_x, screen_y):
+        """Draw 2D representation of Steve using Minecraft skin texture"""
+        try:
+            # Steve skin is 64x64, we need to extract the front face parts
+            # Head: (8, 8, 8, 8) - front face of head
+            # Body: (20, 20, 8, 12) - front of body
+            # Arms: (44, 20, 4, 12) - front of right arm
+            # Legs: (4, 20, 4, 12) - front of right leg
             
-            # Main body color (blue shirt)
-            pygame.draw.rect(screen, (0, 100, 200), body_rect)
+            # Scale factor to fit our player size
+            scale_x = self.width / 8  # 8 pixels wide in texture
+            scale_y = self.height / 20  # Approximate total height
             
-            # Head (top quarter)
+            # Head (top quarter of player)
             head_height = self.height // 4
             head_rect = pygame.Rect(screen_x, screen_y, self.width, head_height)
-            pygame.draw.rect(screen, (255, 220, 177), head_rect)  # Skin color
             
-            # Pants (bottom half)
-            pants_height = self.height // 2
-            pants_rect = pygame.Rect(screen_x, screen_y + self.height - pants_height, self.width, pants_height)
-            pygame.draw.rect(screen, (50, 50, 150), pants_rect)  # Dark blue pants
+            # Extract and scale head texture
+            head_texture = self.player_skin.subsurface((8, 8, 8, 8))
+            head_scaled = pygame.transform.scale(head_texture, (self.width, head_height))
+            screen.blit(head_scaled, head_rect)
             
-            # Body outline
-            pygame.draw.rect(screen, BLACK, body_rect, 2)
+            # Body (middle portion)
+            body_height = self.height // 2
+            body_rect = pygame.Rect(screen_x, screen_y + head_height, self.width, body_height)
             
-            # Draw pixelated face
-            eye_size = 2
-            # Eyes
-            pygame.draw.rect(screen, BLACK, (int(screen_x + self.width * 0.25), int(screen_y + 6), eye_size, eye_size))
-            pygame.draw.rect(screen, BLACK, (int(screen_x + self.width * 0.75 - eye_size), int(screen_y + 6), eye_size, eye_size))
+            # Extract and scale body texture
+            body_texture = self.player_skin.subsurface((20, 20, 8, 12))
+            body_scaled = pygame.transform.scale(body_texture, (self.width, body_height))
+            screen.blit(body_scaled, body_rect)
             
-            # Mouth (simple line)
-            mouth_y = int(screen_y + 12)
-            pygame.draw.rect(screen, BLACK, (int(screen_x + self.width * 0.4), mouth_y, int(self.width * 0.2), 1))
+            # Legs (bottom quarter)
+            legs_height = self.height // 4
+            legs_rect = pygame.Rect(screen_x, screen_y + head_height + body_height, self.width, legs_height)
             
-            # Arms (simple rectangles on sides)
-            arm_width = 4
-            arm_height = self.height // 3
+            # Extract and scale leg texture
+            leg_texture = self.player_skin.subsurface((4, 20, 4, 12))
+            leg_scaled = pygame.transform.scale(leg_texture, (self.width, legs_height))
+            screen.blit(leg_scaled, legs_rect)
+            
+            # Draw simple arms on the sides
+            arm_width = 3
+            arm_height = body_height // 2
+            arm_texture = self.player_skin.subsurface((44, 20, 4, 12))
+            
             # Left arm
-            pygame.draw.rect(screen, (255, 220, 177), (screen_x - arm_width, screen_y + head_height, arm_width, arm_height))
-            pygame.draw.rect(screen, BLACK, (screen_x - arm_width, screen_y + head_height, arm_width, arm_height), 1)
+            left_arm_scaled = pygame.transform.scale(arm_texture, (arm_width, arm_height))
+            screen.blit(left_arm_scaled, (screen_x - arm_width, screen_y + head_height))
+            
             # Right arm
-            pygame.draw.rect(screen, (255, 220, 177), (screen_x + self.width, screen_y + head_height, arm_width, arm_height))
-            pygame.draw.rect(screen, BLACK, (screen_x + self.width, screen_y + head_height, arm_width, arm_height), 1)
+            right_arm_scaled = pygame.transform.scale(arm_texture, (arm_width, arm_height))
+            screen.blit(right_arm_scaled, (screen_x + self.width, screen_y + head_height))
+            
+        except Exception as e:
+            print(f"Error drawing Steve texture: {e}")
+            # Fall back to simple rendering
+            self.draw_fallback_player(screen, screen_x, screen_y)
+    
+    def draw_fallback_player(self, screen, screen_x, screen_y):
+        """Draw player with 8-bit style (fallback)"""
+        # Draw player body with 8-bit style
+        body_rect = pygame.Rect(screen_x, screen_y, self.width, self.height)
+        
+        # Main body color (blue shirt)
+        pygame.draw.rect(screen, (0, 100, 200), body_rect)
+        
+        # Head (top quarter)
+        head_height = self.height // 4
+        head_rect = pygame.Rect(screen_x, screen_y, self.width, head_height)
+        pygame.draw.rect(screen, (255, 220, 177), head_rect)  # Skin color
+        
+        # Pants (bottom half)
+        pants_height = self.height // 2
+        pants_rect = pygame.Rect(screen_x, screen_y + self.height - pants_height, self.width, pants_height)
+        pygame.draw.rect(screen, (50, 50, 150), pants_rect)  # Dark blue pants
+        
+        # Body outline
+        pygame.draw.rect(screen, BLACK, body_rect, 2)
+        
+        # Draw pixelated face
+        eye_size = 2
+        # Eyes
+        pygame.draw.rect(screen, BLACK, (int(screen_x + self.width * 0.25), int(screen_y + 6), eye_size, eye_size))
+        pygame.draw.rect(screen, BLACK, (int(screen_x + self.width * 0.75 - eye_size), int(screen_y + 6), eye_size, eye_size))
+        
+        # Mouth (simple line)
+        mouth_y = int(screen_y + 12)
+        pygame.draw.rect(screen, BLACK, (int(screen_x + self.width * 0.4), mouth_y, int(self.width * 0.2), 1))
+        
+        # Arms (simple rectangles on sides)
+        arm_width = 4
+        arm_height = self.height // 3
+        # Left arm
+        pygame.draw.rect(screen, (255, 220, 177), (screen_x - arm_width, screen_y + head_height, arm_width, arm_height))
+        pygame.draw.rect(screen, BLACK, (screen_x - arm_width, screen_y + head_height, arm_width, arm_height), 1)
+        # Right arm
+        pygame.draw.rect(screen, (255, 220, 177), (screen_x + self.width, screen_y + head_height, arm_width, arm_height))
+        pygame.draw.rect(screen, BLACK, (screen_x + self.width, screen_y + head_height, arm_width, arm_height), 1)
