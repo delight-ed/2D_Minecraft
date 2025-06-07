@@ -338,11 +338,12 @@ class World:
             'vel_y': -2,  # Initial upward velocity
             'vel_x': random.uniform(-1, 1),  # Random horizontal velocity
             'time': 0,
-            'on_ground': False
+            'on_ground': False,
+            'count': 1  # Stack count
         })
     
     def update_item_drops(self):
-        """Update physics for item drops - no sliding, proper falling"""
+        """Update physics for item drops with stacking"""
         for item in self.item_drops:
             item['time'] += 1
             
@@ -391,6 +392,39 @@ class World:
                     if not self.is_solid(below_block_x, below_block_y):
                         item['on_ground'] = False
                         item['vel_y'] = 0  # Start falling from rest
+        
+        # Stack nearby items of the same type
+        self.stack_nearby_items()
+    
+    def stack_nearby_items(self):
+        """Stack nearby items of the same type"""
+        stacking_distance = 16  # Pixels
+        
+        for i, item1 in enumerate(self.item_drops):
+            if item1['count'] >= 64:  # Already at max stack
+                continue
+                
+            for j, item2 in enumerate(self.item_drops):
+                if i >= j or item2['count'] >= 64:  # Skip same item or full stacks
+                    continue
+                
+                if item1['type'] != item2['type']:  # Different item types
+                    continue
+                
+                # Check distance
+                distance = ((item1['x'] - item2['x']) ** 2 + (item1['y'] - item2['y']) ** 2) ** 0.5
+                if distance <= stacking_distance:
+                    # Stack items
+                    total_count = item1['count'] + item2['count']
+                    if total_count <= 64:
+                        # Merge completely
+                        item1['count'] = total_count
+                        self.item_drops.remove(item2)
+                        break  # Break inner loop since we modified the list
+                    else:
+                        # Partial merge
+                        item1['count'] = 64
+                        item2['count'] = total_count - 64
     
     def find_spawn_position(self):
         """Find a safe spawn position on the surface"""

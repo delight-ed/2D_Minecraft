@@ -56,6 +56,9 @@ class Game:
             # Performance tracking
             self.frame_timer = Timer()
             
+            # Mouse state tracking
+            self.mouse_held = False
+            
             self.error_handler.log_info("Game initialized successfully", "Game.__init__")
             
         except Exception as e:
@@ -176,15 +179,17 @@ class Game:
                     
                     # Only handle world interactions if inventory is closed
                     if not self.inventory_gui.is_open:
-                        mouse_x, mouse_y = pygame.mouse.get_pos()
-                        
                         if event.button == 1 and self.keybinds['mine'] == 'left_click':  # Left click - mine
-                            self.player.mine_block(self.world, mouse_x, mouse_y, 
-                                                 self.camera.x, self.camera.y)
-                        
+                            self.mouse_held = True
                         elif event.button == 3 and self.keybinds['place'] == 'right_click':  # Right click - place
+                            mouse_x, mouse_y = pygame.mouse.get_pos()
                             self.player.place_block(self.world, mouse_x, mouse_y,
                                                   self.camera.x, self.camera.y)
+                
+                elif event.type == pygame.MOUSEBUTTONUP:
+                    if event.button == 1:  # Left click released
+                        self.mouse_held = False
+                        self.player.stop_mining()
         except Exception as e:
             self.error_handler.log_error(e, "handle_game_events")
     
@@ -204,6 +209,12 @@ class Game:
             if not self.inventory_gui.is_open:
                 keys = pygame.key.get_pressed()
                 self.player.handle_input(keys)
+                
+                # Handle continuous mining while mouse is held
+                if self.mouse_held:
+                    mouse_x, mouse_y = pygame.mouse.get_pos()
+                    self.player.mine_block(self.world, mouse_x, mouse_y,
+                                         self.camera.x, self.camera.y)
             
             self.player.update(self.world)
             self.player.pickup_items(self.world)
@@ -234,6 +245,14 @@ class Game:
             # Draw world and player
             self.renderer.draw_world(self.world, self.camera)
             self.player.draw(self.screen, self.camera.x, self.camera.y)
+            
+            # Draw block selection highlight
+            if not self.inventory_gui.is_open:
+                mouse_x, mouse_y = pygame.mouse.get_pos()
+                self.renderer.draw_block_selection(self.player, self.world, self.camera, mouse_x, mouse_y)
+            
+            # Draw block breaking animation
+            self.renderer.draw_block_breaking_animation(self.player, self.camera)
             
             # Draw UI
             self.renderer.draw_ui(self.player)

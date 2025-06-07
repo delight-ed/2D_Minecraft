@@ -61,7 +61,7 @@ class Renderer:
             pygame.draw.rect(self.screen, BLACK, (x, y, BLOCK_SIZE, BLOCK_SIZE), 1)
     
     def draw_item_drops(self, world, camera):
-        """Draw item drops in the world with textures"""
+        """Draw item drops in the world with textures and stacking"""
         for item in world.item_drops:
             screen_x = item['x'] - camera.x
             screen_y = item['y'] - camera.y
@@ -101,6 +101,59 @@ class Renderer:
                                        (screen_x - item_size//2, screen_y - item_size//2, item_size, item_size))
                         pygame.draw.rect(self.screen, BLACK, 
                                        (screen_x - item_size//2, screen_y - item_size//2, item_size, item_size), 1)
+                
+                # Draw stack count if more than 1
+                if item['count'] > 1:
+                    count_text = self.small_font.render(str(item['count']), True, WHITE)
+                    count_rect = count_text.get_rect()
+                    count_rect.center = (screen_x + item_size//2 - 4, screen_y + item_size//2 - 4)
+                    
+                    # Draw background for count
+                    bg_rect = count_rect.copy()
+                    bg_rect.inflate(2, 2)
+                    pygame.draw.rect(self.screen, BLACK, bg_rect)
+                    
+                    self.screen.blit(count_text, count_rect)
+    
+    def draw_block_selection(self, player, world, camera, mouse_x, mouse_y):
+        """Draw selection outline around block that can be interacted with"""
+        world_x, world_y = player.get_block_at_mouse(mouse_x, mouse_y, camera.x, camera.y)
+        
+        # Check if player can interact with this block
+        if player.can_interact_with_block(world, world_x, world_y):
+            block_type = world.get_block(world_x, world_y)
+            
+            # Only show selection if there's a block to mine or empty space to place
+            if block_type != BLOCK_AIR or player.get_selected_block() != BLOCK_AIR:
+                screen_x = world_x * BLOCK_SIZE - camera.x
+                screen_y = world_y * BLOCK_SIZE - camera.y
+                
+                # Draw selection outline
+                selection_color = (255, 255, 255, 100)  # White with transparency
+                selection_rect = pygame.Rect(screen_x, screen_y, BLOCK_SIZE, BLOCK_SIZE)
+                
+                # Create surface for transparent outline
+                selection_surface = pygame.Surface((BLOCK_SIZE, BLOCK_SIZE), pygame.SRCALPHA)
+                pygame.draw.rect(selection_surface, selection_color, selection_surface.get_rect(), 3)
+                
+                self.screen.blit(selection_surface, (screen_x, screen_y))
+    
+    def draw_block_breaking_animation(self, player, camera):
+        """Draw block breaking animation"""
+        if player.breaking_block is not None:
+            world_x, world_y = player.breaking_block
+            screen_x = world_x * BLOCK_SIZE - camera.x
+            screen_y = world_y * BLOCK_SIZE - camera.y
+            
+            # Only draw if on screen
+            if (-BLOCK_SIZE <= screen_x <= SCREEN_WIDTH and 
+                -BLOCK_SIZE <= screen_y <= SCREEN_HEIGHT):
+                
+                stage = player.get_breaking_animation_stage()
+                if stage >= 0:
+                    breaking_texture = self.texture_manager.get_breaking_texture(stage)
+                    if breaking_texture:
+                        self.screen.blit(breaking_texture, (screen_x, screen_y))
     
     def draw_hotbar(self, player):
         """Draw the hotbar at the bottom of the screen with textures"""

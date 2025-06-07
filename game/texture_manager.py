@@ -11,12 +11,12 @@ class TextureManager:
         self.assets_path = "game/assets"
         self.texture_pack_path = "game/assets/VanillaDefault 1.21.5.zip"
         
-        # Block ID mappings
+        # Comprehensive block and item mappings
         self.block_mappings = {
             BLOCK_DIRT: "dirt",
             BLOCK_GRASS: "grass_block",
             BLOCK_STONE: "stone",
-            BLOCK_WATER: "water",
+            BLOCK_WATER: "water_still",
             BLOCK_SAND: "sand",
             BLOCK_WOOD: "oak_log",
             BLOCK_LEAVES: "oak_leaves",
@@ -27,6 +27,15 @@ class TextureManager:
             ITEM_STICK: "stick",
             ITEM_CRAFTING_TABLE: "crafting_table",
             ITEM_WOODEN_PICKAXE: "wooden_pickaxe",
+        }
+        
+        # Alternative names to try if primary doesn't work
+        self.alternative_mappings = {
+            BLOCK_WATER: ["water", "water_flow", "water_still"],
+            BLOCK_WOOD: ["oak_log", "log", "wood"],
+            BLOCK_LEAVES: ["oak_leaves", "leaves"],
+            BLOCK_COAL: ["coal_ore", "coal_block"],
+            BLOCK_IRON: ["iron_ore", "iron_block"],
         }
         
         self.load_textures()
@@ -40,22 +49,25 @@ class TextureManager:
             self.create_fallback_textures()
     
     def load_from_zip(self):
-        """Load textures from ZIP file"""
+        """Load textures from ZIP file with comprehensive mapping"""
         try:
             with zipfile.ZipFile(self.texture_pack_path, 'r') as zip_file:
                 # Get list of all files in the ZIP
                 file_list = zip_file.namelist()
                 
+                # Try to find and load mapping file first
+                mapping_data = self.load_mapping_file(zip_file, file_list)
+                
                 # Load block textures
                 for block_id, minecraft_name in self.block_mappings.items():
-                    self.load_texture_from_zip(zip_file, file_list, block_id, minecraft_name, "block")
+                    self.load_texture_from_zip(zip_file, file_list, block_id, minecraft_name, "block", mapping_data)
                 
                 # Load item textures
                 item_types = [ITEM_STICK, ITEM_CRAFTING_TABLE, ITEM_WOODEN_PICKAXE]
                 for item_id in item_types:
                     minecraft_name = self.block_mappings.get(item_id)
                     if minecraft_name:
-                        self.load_texture_from_zip(zip_file, file_list, item_id, minecraft_name, "item")
+                        self.load_texture_from_zip(zip_file, file_list, item_id, minecraft_name, "item", mapping_data)
                 
                 # Load special textures
                 self.load_special_textures_from_zip(zip_file, file_list)
@@ -69,38 +81,60 @@ class TextureManager:
             print(f"Error loading from ZIP: {e}")
             self.create_fallback_textures()
     
-    def load_texture_from_zip(self, zip_file, file_list, item_id, minecraft_name, texture_type):
-        """Load a specific texture from ZIP file"""
-        # Try different possible paths
-        possible_paths = [
-            f"assets/minecraft/textures/{texture_type}/{minecraft_name}.png",
-            f"minecraft/textures/{texture_type}/{minecraft_name}.png",
-            f"textures/{texture_type}/{minecraft_name}.png",
-            f"{texture_type}/{minecraft_name}.png",
-            f"{minecraft_name}.png"
+    def load_mapping_file(self, zip_file, file_list):
+        """Try to load mapping file from the ZIP"""
+        mapping_files = [
+            "assets/minecraft/blockstates/",
+            "assets/minecraft/models/block/",
+            "assets/minecraft/models/item/",
+            "pack.mcmeta"
         ]
         
-        for path in possible_paths:
-            if path in file_list:
-                try:
-                    # Extract and load the texture
-                    texture_data = zip_file.read(path)
-                    
-                    # Create a temporary file-like object
-                    import io
-                    texture_file = io.BytesIO(texture_data)
-                    
-                    # Load the image
-                    original_texture = pygame.image.load(texture_file).convert_alpha()
-                    scaled_texture = pygame.transform.scale(original_texture, (self.block_size, self.block_size))
-                    
-                    self.textures[item_id] = scaled_texture
-                    print(f"Loaded {minecraft_name} from {path}")
-                    return True
-                    
-                except Exception as e:
-                    print(f"Error loading {path}: {e}")
-                    continue
+        # For now, we'll use our own mapping since Minecraft's structure is complex
+        # In a real implementation, you'd parse the JSON files to get proper mappings
+        return None
+    
+    def load_texture_from_zip(self, zip_file, file_list, item_id, minecraft_name, texture_type, mapping_data=None):
+        """Load a specific texture from ZIP file with multiple fallbacks"""
+        # Try different possible paths and names
+        names_to_try = [minecraft_name]
+        
+        # Add alternative names if available
+        if item_id in self.alternative_mappings:
+            names_to_try.extend(self.alternative_mappings[item_id])
+        
+        for name in names_to_try:
+            possible_paths = [
+                f"assets/minecraft/textures/{texture_type}/{name}.png",
+                f"minecraft/textures/{texture_type}/{name}.png",
+                f"textures/{texture_type}/{name}.png",
+                f"{texture_type}/{name}.png",
+                f"{name}.png",
+                f"assets/minecraft/textures/blocks/{name}.png",  # Legacy path
+                f"assets/minecraft/textures/items/{name}.png",   # Legacy path
+            ]
+            
+            for path in possible_paths:
+                if path in file_list:
+                    try:
+                        # Extract and load the texture
+                        texture_data = zip_file.read(path)
+                        
+                        # Create a temporary file-like object
+                        import io
+                        texture_file = io.BytesIO(texture_data)
+                        
+                        # Load the image
+                        original_texture = pygame.image.load(texture_file).convert_alpha()
+                        scaled_texture = pygame.transform.scale(original_texture, (self.block_size, self.block_size))
+                        
+                        self.textures[item_id] = scaled_texture
+                        print(f"Loaded {name} from {path}")
+                        return True
+                        
+                    except Exception as e:
+                        print(f"Error loading {path}: {e}")
+                        continue
         
         # If not found, create fallback
         print(f"Texture not found for {minecraft_name}, creating fallback")
@@ -114,7 +148,8 @@ class TextureManager:
             "assets/minecraft/textures/block/grass_block_side.png",
             "minecraft/textures/block/grass_block_side.png",
             "textures/block/grass_block_side.png",
-            "block/grass_block_side.png"
+            "block/grass_block_side.png",
+            "assets/minecraft/textures/blocks/grass_side.png"  # Legacy
         ]
         
         for path in grass_side_paths:
@@ -135,7 +170,8 @@ class TextureManager:
             "assets/minecraft/textures/block/oak_log.png",
             "minecraft/textures/block/oak_log.png",
             "textures/block/oak_log.png",
-            "block/oak_log.png"
+            "block/oak_log.png",
+            "assets/minecraft/textures/blocks/log_oak.png"  # Legacy
         ]
         
         for path in wood_side_paths:
@@ -159,7 +195,8 @@ class TextureManager:
             "textures/entity/player/wide/steve.png",
             "entity/player/wide/steve.png",
             "player/wide/steve.png",
-            "steve.png"
+            "steve.png",
+            "assets/minecraft/textures/entity/steve.png"  # Alternative path
         ]
         
         for path in steve_paths:
@@ -230,3 +267,36 @@ class TextureManager:
     def has_texture(self, item_type):
         """Check if texture exists for item type"""
         return item_type in self.textures
+    
+    def create_breaking_animation_textures(self):
+        """Create block breaking animation textures"""
+        breaking_textures = {}
+        
+        # Create 10 stages of breaking animation
+        for stage in range(10):
+            surface = pygame.Surface((self.block_size, self.block_size), pygame.SRCALPHA)
+            
+            # Create crack pattern that gets more intense
+            crack_intensity = (stage + 1) / 10.0
+            crack_color = (255, 255, 255, int(100 * crack_intensity))
+            
+            # Draw crack lines
+            for i in range(int(5 * crack_intensity)):
+                start_x = int(self.block_size * (i / (5 * crack_intensity)))
+                start_y = 0
+                end_x = int(self.block_size * ((i + 1) / (5 * crack_intensity)))
+                end_y = self.block_size
+                
+                pygame.draw.line(surface, crack_color, (start_x, start_y), (end_x, end_y), 2)
+                pygame.draw.line(surface, crack_color, (start_x, end_y), (end_x, start_y), 2)
+            
+            breaking_textures[stage] = surface
+        
+        return breaking_textures
+    
+    def get_breaking_texture(self, stage):
+        """Get breaking animation texture for given stage (0-9)"""
+        if not hasattr(self, 'breaking_textures'):
+            self.breaking_textures = self.create_breaking_animation_textures()
+        
+        return self.breaking_textures.get(stage, None)

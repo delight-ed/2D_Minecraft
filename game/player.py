@@ -14,7 +14,9 @@ class Player:
         self.speed = 6
         # Minecraft player can jump exactly 1.25 blocks high
         # With 32px blocks, that's 40 pixels total jump height
-        self.jump_power = 12.5  # Adjusted for exactly 1.25 blocks
+        # Using physics: v² = u² + 2as, where s = 40, a = 0.8 (gravity)
+        # So u = sqrt(2 * 0.8 * 40) = sqrt(64) = 8
+        self.jump_power = 8.0  # Exactly 1.25 blocks with gravity 0.8
         self.gravity = 0.8
         self.on_ground = False
         self.keybinds = keybinds
@@ -28,6 +30,12 @@ class Player:
         # Tools and mining
         self.current_tool = None
         self.can_mine_stone = False
+        
+        # Block breaking animation
+        self.breaking_block = None  # (x, y) of block being broken
+        self.breaking_progress = 0  # 0-100
+        self.breaking_time = 0  # Time spent breaking current block
+        self.break_speed = 2.0  # Progress per frame when mining
         
         # Load player textures
         self.load_player_textures()
@@ -74,6 +82,15 @@ class Player:
         
         # Update tool status
         self.update_tool_status()
+        
+        # Update breaking animation
+        self.update_breaking_animation()
+    
+    def update_breaking_animation(self):
+        """Update block breaking animation"""
+        if self.breaking_block is None:
+            self.breaking_progress = 0
+            self.breaking_time = 0
     
     def check_collision_horizontal(self, world, x, y):
         """Check horizontal collision with better precision"""
@@ -243,12 +260,15 @@ class Player:
                     self.hotbar[i] = block_type
                     break
     
-    def mine_block(self, world, mouse_x, mouse_y, camera_x, camera_y):
-        """Mine block at mouse position with improved line of sight check"""
+    def get_block_at_mouse(self, mouse_x, mouse_y, camera_x, camera_y):
+        """Get block coordinates at mouse position"""
         world_x = int((mouse_x + camera_x) // BLOCK_SIZE)
         world_y = int((mouse_y + camera_y) // BLOCK_SIZE)
-        
-        # Check mining range
+        return world_x, world_y
+    
+    def can_interact_with_block(self, world, world_x, world_y):
+        """Check if player can interact with block (within range and line of sight)"""
+        # Check interaction range
         player_center_x = self.x + self.width // 2
         player_center_y = self.y + self.height // 2
         block_center_x = world_x * BLOCK_SIZE + BLOCK_SIZE // 2
@@ -256,44 +276,73 @@ class Player:
         
         distance = ((player_center_x - block_center_x) ** 2 + (player_center_y - block_center_y) ** 2) ** 0.5
         
-        if distance > BLOCK_SIZE * 5:  # Mining range limit
+        if distance > BLOCK_SIZE * 5:  # Interaction range limit
             return False
         
         # Check line of sight from player's head
-        if not self.has_line_of_sight(world, block_center_x, block_center_y):
-            return False
-        
+        return self.has_line_of_sight(world, block_center_x, block_center_y)
+    
+    def start_mining_block(self, world, world_x, world_y):
+        """Start mining a block"""
         block_type = world.get_block(world_x, world_y)
         
         if block_type != BLOCK_AIR and self.can_mine_block(block_type):
-            world.set_block(world_x, world_y, BLOCK_AIR)
-            
-            # Create item drops
-            drops = self.get_block_drops(block_type)
-            for drop in drops:
-                world.add_item_drop(block_center_x, block_center_y, drop)
-            
+            self.breaking_block = (world_x, world_y)
+            self.breaking_progress = 0
+            self.breaking_time = 0
             return True
         return False
     
-    def place_block(self, world, mouse_x, mouse_y, camera_x, camera_y):
-        """Place block at mouse position with improved placement rules"""
-        world_x = int((mouse_x + camera_x) // BLOCK_SIZE)
-        world_y = int((mouse_y + camera_y) // BLOCK_SIZE)
+    def continue_mining_block(self, world, world_x, world_y):
+        """Continue mining the current block"""
+        if self.breaking_block == (world_x, world_y):
+            self.breaking_progress += self.break_speed
+            self.breaking_time += 1
+            
+            if self.breaking_progress >= 100:
+                # Block is broken
+                block_type = world.get_block(world_x, world_y)
+                world.set_block(world_x, world_y, BLOCK_AIR)
+                
+                # Create item drops
+                drops = self.get_block_drops(block_type)
+                block_center_x = world_x * BLOCK_SIZE + BLOCK_SIZE // 2
+                block_center_y = world_y * BLOCK_SIZE + BLOCK_SIZE // 2
+                for drop in drops:
+                    world.add_item_drop(block_center_x, block_center_y, drop)
+                
+                # Reset breaking state
+                self.breaking_block = None
+                self.breaking_progress = 0
+                self.breaking_time = 0
+                return True
+        else:
+            # Different block, start mining this one
+            self.start_mining_block(world, world_x, world_y)
         
-        # Check placement range
-        player_center_x = self.x + self.width // 2
-        player_center_y = self.y + self.height // 2
-        block_center_x = world_x * BLOCK_SIZE + BLOCK_SIZE // 2
-        block_center_y = world_y * BLOCK_SIZE + BLOCK_SIZE // 2
+        return False
+    
+    def stop_mining(self):
+        """Stop mining current block"""
+        self.breaking_block = None
+        self.breaking_progress = 0
+        self.breaking_time = 0
+    
+    def mine_block(self, world, mouse_x, mouse_y, camera_x, camera_y):
+        """Mine block at mouse position with improved line of sight check"""
+        world_x, world_y = self.get_block_at_mouse(mouse_x, mouse_y, camera_x, camera_y)
         
-        distance = ((player_center_x - block_center_x) ** 2 + (player_center_y - block_center_y) ** 2) ** 0.5
-        
-        if distance > BLOCK_SIZE * 5:  # Placement range limit
+        if not self.can_interact_with_block(world, world_x, world_y):
+            self.stop_mining()
             return False
         
-        # Check line of sight from player's head
-        if not self.has_line_of_sight(world, block_center_x, block_center_y):
+        return self.continue_mining_block(world, world_x, world_y)
+    
+    def place_block(self, world, mouse_x, mouse_y, camera_x, camera_y):
+        """Place block at mouse position with improved placement rules"""
+        world_x, world_y = self.get_block_at_mouse(mouse_x, mouse_y, camera_x, camera_y)
+        
+        if not self.can_interact_with_block(world, world_x, world_y):
             return False
         
         # Check if target position is air
@@ -344,10 +393,20 @@ class Player:
                                  self.width + BLOCK_SIZE * 2, self.height + BLOCK_SIZE * 2)
         
         for item in world.item_drops[:]:  # Copy list to avoid modification during iteration
+            # Only pick up items that have been on ground for a bit
+            if item['time'] < 10:  # 10 frames delay before pickup
+                continue
+                
             item_rect = pygame.Rect(item['x'] - 8, item['y'] - 8, 16, 16)
             if player_rect.colliderect(item_rect):
                 self.add_to_inventory(item['type'])
                 world.item_drops.remove(item)
+    
+    def get_breaking_animation_stage(self):
+        """Get current breaking animation stage (0-9)"""
+        if self.breaking_block is None:
+            return -1
+        return min(9, int(self.breaking_progress / 10))
     
     def draw(self, screen, camera_x, camera_y):
         """Draw player with Minecraft Steve texture or fallback"""
