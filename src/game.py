@@ -1,5 +1,6 @@
 import pygame
 import random
+import math
 from src.world import World
 from src.player import Player
 from src.camera import Camera
@@ -28,7 +29,7 @@ class Game:
         self.spawn_initial_mobs()
     
     def spawn_initial_mobs(self):
-        for _ in range(20):
+        for _ in range(10):  # Reduced from 20 to 10
             x = random.randint(100, WORLD_WIDTH * BLOCK_SIZE - 100)
             y = self.world.get_surface_height(x // BLOCK_SIZE) * BLOCK_SIZE - 50
             mob_type = random.choice([MOB_ZOMBIE, MOB_SKELETON, MOB_SPIDER])
@@ -57,9 +58,9 @@ class Game:
             
             # Update day/night cycle
             self.day_night_cycle += dt * 0.1
-            if self.day_night_cycle >= 2 * 3.14159:
+            if self.day_night_cycle >= 2 * math.pi:
                 self.day_night_cycle = 0
-            self.is_day = self.day_night_cycle < 3.14159
+            self.is_day = self.day_night_cycle < math.pi
             
             # Spawn mobs at night
             if not self.is_day and random.random() < 0.001:
@@ -80,7 +81,7 @@ class Game:
         if self.is_day:
             self.screen.fill(LIGHT_BLUE)
         else:
-            darkness = int(50 + 50 * abs(pygame.math.Vector2(1, 0).angle_to(pygame.math.Vector2(pygame.math.cos(self.day_night_cycle), pygame.math.sin(self.day_night_cycle)))) / 180)
+            darkness = int(50 + 50 * abs(math.cos(self.day_night_cycle)))
             self.screen.fill((darkness, darkness, darkness + 20))
         
         # Render world

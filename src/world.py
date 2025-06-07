@@ -1,6 +1,5 @@
 import pygame
 import random
-import noise
 import math
 from src.constants import *
 
@@ -54,23 +53,39 @@ class World:
         chunk.set_block(local_x, y, block)
     
     def generate_world(self):
-        for chunk_x in range(-10, 50):
+        # Generate fewer chunks initially to prevent segfault
+        for chunk_x in range(-5, 15):
             self.generate_chunk(chunk_x)
+    
+    def simple_noise(self, x, frequency=0.01, amplitude=1.0):
+        """Simple noise function to replace the problematic noise library"""
+        # Use sine waves and random values for terrain generation
+        value = 0
+        value += math.sin(x * frequency) * amplitude * 0.5
+        value += math.sin(x * frequency * 2) * amplitude * 0.25
+        value += math.sin(x * frequency * 4) * amplitude * 0.125
+        
+        # Add some randomness based on seed
+        random.seed(int(x + self.seed))
+        value += (random.random() - 0.5) * amplitude * 0.3
+        
+        return value
     
     def generate_chunk(self, chunk_x):
         chunk = self.get_chunk(chunk_x)
         
-        # Determine biome
-        biome_noise = noise.pnoise1(chunk_x * 0.1, base=self.seed)
-        if biome_noise < -0.3:
+        # Determine biome using simple math instead of noise
+        biome_value = abs(math.sin(chunk_x * 0.1 + self.seed * 0.001)) * 6
+        
+        if biome_value < 1:
             chunk.biome = BIOME_OCEAN
-        elif biome_noise < -0.1:
+        elif biome_value < 2:
             chunk.biome = BIOME_DESERT
-        elif biome_noise < 0.1:
+        elif biome_value < 3:
             chunk.biome = BIOME_PLAINS
-        elif biome_noise < 0.3:
+        elif biome_value < 4:
             chunk.biome = BIOME_FOREST
-        elif biome_noise < 0.5:
+        elif biome_value < 5:
             chunk.biome = BIOME_MOUNTAINS
         else:
             chunk.biome = BIOME_SNOW
@@ -84,15 +99,12 @@ class World:
         self.generate_structures(chunk)
     
     def generate_column(self, x, chunk):
-        # Height generation with multiple octaves
-        height = 0
-        amplitude = 1
-        frequency = 0.01
+        # Height generation using simple noise
+        height = self.simple_noise(x, 0.01, 1.0)
         
-        for _ in range(4):
-            height += noise.pnoise1(x * frequency, base=self.seed) * amplitude
-            amplitude *= 0.5
-            frequency *= 2
+        # Add additional octaves
+        height += self.simple_noise(x, 0.02, 0.5)
+        height += self.simple_noise(x, 0.04, 0.25)
         
         # Adjust height based on biome
         if chunk.biome == BIOME_MOUNTAINS:

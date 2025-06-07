@@ -1,4 +1,5 @@
 import random
+import math
 from src.mob import Mob
 from src.constants import *
 
@@ -48,7 +49,7 @@ class MobManager:
     
     def spawn_random_mob(self, player, world):
         # Spawn mob near player but not too close
-        angle = random.uniform(0, 2 * 3.14159)
+        angle = random.uniform(0, 2 * math.pi)
         distance = random.uniform(300, 500)
         
         spawn_x = player.x + distance * math.cos(angle)
