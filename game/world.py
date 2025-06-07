@@ -2,48 +2,39 @@ import random
 import noise
 from .constants import *
 
-class World:
-    def __init__(self):
-        self.blocks = [[BLOCK_AIR for _ in range(WORLD_HEIGHT)] for _ in range(WORLD_WIDTH)]
-        self.biomes = [BIOME_PLAINS for _ in range(WORLD_WIDTH)]
-        self.item_drops = []  # List of item drops in the world
-        self.generate_world()
+class Chunk:
+    def __init__(self, chunk_x):
+        self.chunk_x = chunk_x
+        self.blocks = [[BLOCK_AIR for _ in range(WORLD_HEIGHT)] for _ in range(CHUNK_SIZE)]
+        self.biomes = [BIOME_PLAINS for _ in range(CHUNK_SIZE)]
+        self.generated = False
     
-    def generate_world(self):
-        """Generate a realistic 2D world with biomes and structures"""
-        print("Generating biomes...")
-        self.generate_biomes()
+    def generate(self, world_seed=0):
+        """Generate this chunk"""
+        if self.generated:
+            return
         
-        print("Generating terrain...")
-        self.generate_terrain()
-        
-        print("Adding ores...")
-        self.generate_ores()
-        
-        print("Adding structures...")
-        self.generate_structures()
-    
-    def generate_biomes(self):
-        """Generate biome distribution"""
-        for x in range(WORLD_WIDTH):
-            biome_noise = noise.pnoise1(x * 0.01, octaves=2, persistence=0.5)
+        # Generate biomes for this chunk
+        for local_x in range(CHUNK_SIZE):
+            world_x = self.chunk_x * CHUNK_SIZE + local_x
+            biome_noise = noise.pnoise1(world_x * 0.01, octaves=2, persistence=0.5)
             
             if biome_noise < -0.3:
-                self.biomes[x] = BIOME_DESERT
+                self.biomes[local_x] = BIOME_DESERT
             elif biome_noise < 0.1:
-                self.biomes[x] = BIOME_PLAINS
+                self.biomes[local_x] = BIOME_PLAINS
             elif biome_noise < 0.4:
-                self.biomes[x] = BIOME_FOREST
+                self.biomes[local_x] = BIOME_FOREST
             else:
-                self.biomes[x] = BIOME_MOUNTAINS
-    
-    def generate_terrain(self):
-        """Generate terrain based on biomes"""
-        for x in range(WORLD_WIDTH):
-            biome = self.biomes[x]
+                self.biomes[local_x] = BIOME_MOUNTAINS
+        
+        # Generate terrain
+        for local_x in range(CHUNK_SIZE):
+            world_x = self.chunk_x * CHUNK_SIZE + local_x
+            biome = self.biomes[local_x]
             
             # Base height with biome variation
-            height_noise = noise.pnoise1(x * 0.02, octaves=4, persistence=0.5, lacunarity=2.0)
+            height_noise = noise.pnoise1(world_x * 0.02, octaves=4, persistence=0.5, lacunarity=2.0)
             
             if biome == BIOME_MOUNTAINS:
                 surface_height = int(SURFACE_LEVEL + height_noise * 25)
@@ -59,56 +50,64 @@ class World:
             for y in range(WORLD_HEIGHT):
                 if y < surface_height:
                     # Air above surface
-                    self.blocks[x][y] = BLOCK_AIR
+                    self.blocks[local_x][y] = BLOCK_AIR
                 elif y == surface_height:
                     # Surface block based on biome
                     if biome == BIOME_DESERT:
-                        self.blocks[x][y] = BLOCK_SAND
+                        self.blocks[local_x][y] = BLOCK_SAND
                     else:
-                        self.blocks[x][y] = BLOCK_GRASS
+                        self.blocks[local_x][y] = BLOCK_GRASS
                 elif y < surface_height + 4:
                     # Dirt layer below surface
                     if biome == BIOME_DESERT:
-                        self.blocks[x][y] = BLOCK_SAND
+                        self.blocks[local_x][y] = BLOCK_SAND
                     else:
-                        self.blocks[x][y] = BLOCK_DIRT
+                        self.blocks[local_x][y] = BLOCK_DIRT
                 else:
                     # Stone below dirt
-                    self.blocks[x][y] = BLOCK_STONE
+                    self.blocks[local_x][y] = BLOCK_STONE
+        
+        # Generate ores
+        self.generate_ores()
+        
+        # Generate structures
+        self.generate_structures()
+        
+        self.generated = True
     
     def generate_ores(self):
-        """Generate ore deposits"""
+        """Generate ore deposits in this chunk"""
         # Coal ore (closer to surface)
-        for _ in range(WORLD_WIDTH * 2):
-            x = random.randint(0, WORLD_WIDTH - 1)
+        for _ in range(CHUNK_SIZE // 4):
+            local_x = random.randint(0, CHUNK_SIZE - 1)
             y = random.randint(SURFACE_LEVEL + 10, WORLD_HEIGHT - 10)
             
-            if self.get_block(x, y) == BLOCK_STONE:
+            if self.get_block(local_x, y) == BLOCK_STONE:
                 # Create small coal vein
                 for dx in range(-1, 2):
                     for dy in range(-1, 2):
-                        if (0 <= x + dx < WORLD_WIDTH and 0 <= y + dy < WORLD_HEIGHT and
-                            self.get_block(x + dx, y + dy) == BLOCK_STONE and
+                        if (0 <= local_x + dx < CHUNK_SIZE and 0 <= y + dy < WORLD_HEIGHT and
+                            self.get_block(local_x + dx, y + dy) == BLOCK_STONE and
                             random.random() < 0.6):
-                            self.blocks[x + dx][y + dy] = BLOCK_COAL
+                            self.blocks[local_x + dx][y + dy] = BLOCK_COAL
         
         # Iron ore (deeper)
-        for _ in range(WORLD_WIDTH):
-            x = random.randint(0, WORLD_WIDTH - 1)
+        for _ in range(CHUNK_SIZE // 8):
+            local_x = random.randint(0, CHUNK_SIZE - 1)
             y = random.randint(SURFACE_LEVEL + 20, WORLD_HEIGHT - 5)
             
-            if self.get_block(x, y) == BLOCK_STONE and random.random() < 0.3:
-                self.blocks[x][y] = BLOCK_IRON
+            if self.get_block(local_x, y) == BLOCK_STONE and random.random() < 0.3:
+                self.blocks[local_x][y] = BLOCK_IRON
     
     def generate_structures(self):
-        """Generate trees and other structures"""
-        for x in range(5, WORLD_WIDTH - 5):
-            biome = self.biomes[x]
+        """Generate trees and other structures in this chunk"""
+        for local_x in range(2, CHUNK_SIZE - 2):
+            biome = self.biomes[local_x]
             
             # Find surface
             surface_y = None
             for y in range(WORLD_HEIGHT):
-                if self.get_block(x, y) != BLOCK_AIR:
+                if self.get_block(local_x, y) != BLOCK_AIR:
                     surface_y = y
                     break
             
@@ -117,12 +116,12 @@ class World:
             
             # Generate trees in forest biome
             if biome == BIOME_FOREST and random.random() < 0.15:
-                self.generate_tree(x, surface_y)
+                self.generate_tree(local_x, surface_y)
             # Occasional trees in plains
             elif biome == BIOME_PLAINS and random.random() < 0.05:
-                self.generate_tree(x, surface_y)
+                self.generate_tree(local_x, surface_y)
     
-    def generate_tree(self, x, surface_y):
+    def generate_tree(self, local_x, surface_y):
         """Generate a tree at the given position"""
         tree_height = random.randint(4, 7)
         
@@ -130,19 +129,109 @@ class World:
         for i in range(tree_height):
             trunk_y = surface_y - 1 - i
             if trunk_y >= 0:
-                self.blocks[x][trunk_y] = BLOCK_WOOD
+                self.blocks[local_x][trunk_y] = BLOCK_WOOD
         
         # Tree leaves (crown above trunk)
         leaf_center_y = surface_y - tree_height - 1
         for dx in range(-2, 3):
             for dy in range(-2, 1):
-                leaf_x = x + dx
+                leaf_x = local_x + dx
                 leaf_y = leaf_center_y + dy
                 
-                if (0 <= leaf_x < WORLD_WIDTH and 0 <= leaf_y >= 0 and
+                if (0 <= leaf_x < CHUNK_SIZE and 0 <= leaf_y >= 0 and
                     self.get_block(leaf_x, leaf_y) == BLOCK_AIR and
                     random.random() < 0.8):
                     self.blocks[leaf_x][leaf_y] = BLOCK_LEAVES
+    
+    def get_block(self, local_x, y):
+        """Get block at local position within chunk"""
+        if 0 <= local_x < CHUNK_SIZE and 0 <= y < WORLD_HEIGHT:
+            return self.blocks[local_x][y]
+        return BLOCK_AIR
+    
+    def set_block(self, local_x, y, block_type):
+        """Set block at local position within chunk"""
+        if 0 <= local_x < CHUNK_SIZE and 0 <= y < WORLD_HEIGHT:
+            self.blocks[local_x][y] = block_type
+            return True
+        return False
+
+
+class World:
+    def __init__(self, seed=None):
+        self.seed = seed or random.randint(0, 1000000)
+        random.seed(self.seed)
+        self.chunks = {}  # Dictionary of chunk_x -> Chunk
+        self.item_drops = []  # List of item drops in the world
+        
+        # Generate initial chunks around spawn
+        spawn_chunk = 0
+        for chunk_x in range(spawn_chunk - 2, spawn_chunk + 3):
+            self.load_chunk(chunk_x)
+    
+    def load_chunk(self, chunk_x):
+        """Load a chunk if it doesn't exist"""
+        if chunk_x not in self.chunks:
+            chunk = Chunk(chunk_x)
+            chunk.generate(self.seed)
+            self.chunks[chunk_x] = chunk
+    
+    def unload_distant_chunks(self, player_chunk_x):
+        """Unload chunks that are too far from the player"""
+        chunks_to_unload = []
+        for chunk_x in self.chunks:
+            if abs(chunk_x - player_chunk_x) > RENDER_DISTANCE + 2:
+                chunks_to_unload.append(chunk_x)
+        
+        for chunk_x in chunks_to_unload:
+            del self.chunks[chunk_x]
+    
+    def ensure_chunks_loaded(self, player_x):
+        """Ensure chunks around player are loaded"""
+        player_chunk_x = int(player_x // (CHUNK_SIZE * BLOCK_SIZE))
+        
+        # Load chunks in render distance
+        for chunk_x in range(player_chunk_x - RENDER_DISTANCE, player_chunk_x + RENDER_DISTANCE + 1):
+            self.load_chunk(chunk_x)
+        
+        # Unload distant chunks to save memory
+        self.unload_distant_chunks(player_chunk_x)
+    
+    def world_to_chunk_coords(self, world_x):
+        """Convert world x coordinate to chunk coordinates"""
+        chunk_x = world_x // CHUNK_SIZE
+        local_x = world_x % CHUNK_SIZE
+        return chunk_x, local_x
+    
+    def get_block(self, x, y):
+        """Get block at world position"""
+        if y < 0 or y >= WORLD_HEIGHT:
+            return BLOCK_AIR
+        
+        chunk_x, local_x = self.world_to_chunk_coords(x)
+        
+        if chunk_x in self.chunks:
+            return self.chunks[chunk_x].get_block(local_x, y)
+        return BLOCK_AIR
+    
+    def set_block(self, x, y, block_type):
+        """Set block at world position"""
+        if y < 0 or y >= WORLD_HEIGHT:
+            return False
+        
+        chunk_x, local_x = self.world_to_chunk_coords(x)
+        
+        # Load chunk if needed
+        self.load_chunk(chunk_x)
+        
+        if chunk_x in self.chunks:
+            return self.chunks[chunk_x].set_block(local_x, y, block_type)
+        return False
+    
+    def is_solid(self, x, y):
+        """Check if block is solid (not air or water)"""
+        block = self.get_block(x, y)
+        return block != BLOCK_AIR and block != BLOCK_WATER
     
     def add_item_drop(self, x, y, item_type):
         """Add an item drop to the world"""
@@ -151,7 +240,9 @@ class World:
             'y': y,
             'type': item_type,
             'vel_y': -2,  # Initial upward velocity
-            'time': 0
+            'vel_x': random.uniform(-1, 1),  # Random horizontal velocity
+            'time': 0,
+            'on_ground': False
         })
     
     def update_item_drops(self):
@@ -160,14 +251,28 @@ class World:
             item['time'] += 1
             
             # Apply gravity
-            item['vel_y'] += 0.3
-            if item['vel_y'] > 8:
-                item['vel_y'] = 8
+            if not item['on_ground']:
+                item['vel_y'] += 0.3
+                if item['vel_y'] > 8:
+                    item['vel_y'] = 8
+            
+            # Apply friction to horizontal movement
+            item['vel_x'] *= 0.98
             
             # Move item
+            new_x = item['x'] + item['vel_x']
             new_y = item['y'] + item['vel_y']
             
-            # Check collision with ground
+            # Check horizontal collision
+            block_x = int(new_x // BLOCK_SIZE)
+            block_y = int(item['y'] // BLOCK_SIZE)
+            
+            if not self.is_solid(block_x, block_y):
+                item['x'] = new_x
+            else:
+                item['vel_x'] = 0
+            
+            # Check vertical collision
             block_x = int(item['x'] // BLOCK_SIZE)
             block_y = int(new_y // BLOCK_SIZE)
             
@@ -175,30 +280,17 @@ class World:
                 # Find the top of the block
                 item['y'] = block_y * BLOCK_SIZE - 8
                 item['vel_y'] = 0
+                item['on_ground'] = True
             else:
                 item['y'] = new_y
-    
-    def get_block(self, x, y):
-        """Get block at position"""
-        if 0 <= x < WORLD_WIDTH and 0 <= y < WORLD_HEIGHT:
-            return self.blocks[x][y]
-        return BLOCK_AIR
-    
-    def set_block(self, x, y, block_type):
-        """Set block at position"""
-        if 0 <= x < WORLD_WIDTH and 0 <= y < WORLD_HEIGHT:
-            self.blocks[x][y] = block_type
-            return True
-        return False
-    
-    def is_solid(self, x, y):
-        """Check if block is solid (not air or water)"""
-        block = self.get_block(x, y)
-        return block != BLOCK_AIR and block != BLOCK_WATER
+                item['on_ground'] = False
     
     def find_spawn_position(self):
         """Find a safe spawn position on the surface"""
-        spawn_x = WORLD_WIDTH // 2
+        spawn_x = 0  # Spawn at world origin
+        
+        # Ensure spawn chunk is loaded
+        self.load_chunk(0)
         
         # Find surface at spawn location
         for y in range(WORLD_HEIGHT):
@@ -208,3 +300,7 @@ class World:
         
         # Fallback if no surface found
         return spawn_x * BLOCK_SIZE, SURFACE_LEVEL * BLOCK_SIZE
+    
+    def get_loaded_chunks(self):
+        """Get list of loaded chunk coordinates"""
+        return list(self.chunks.keys())

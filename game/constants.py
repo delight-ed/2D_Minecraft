@@ -20,6 +20,8 @@ LIGHT_BROWN = (205, 133, 63)
 DARK_GRAY = (64, 64, 64)
 ORANGE = (255, 165, 0)
 PURPLE = (128, 0, 128)
+LIGHT_GRAY = (192, 192, 192)
+DARK_BLUE = (0, 0, 139)
 
 # Block types
 BLOCK_AIR = 0
@@ -51,6 +53,8 @@ BLOCK_COLORS = {
 WORLD_WIDTH = 400
 WORLD_HEIGHT = 150
 SURFACE_LEVEL = 80
+CHUNK_SIZE = 16  # Blocks per chunk
+RENDER_DISTANCE = 8  # Chunks to render around player
 
 # Biome types
 BIOME_PLAINS = 0
@@ -62,3 +66,18 @@ BIOME_MOUNTAINS = 3
 HOTBAR_SIZE = 9
 HOTBAR_SLOT_SIZE = 50
 HOTBAR_MARGIN = 10
+
+# Default keybinds
+DEFAULT_KEYBINDS = {
+    'move_left': 'a',
+    'move_right': 'd',
+    'jump': 'space',
+    'inventory': 'e',
+    'mine': 'left_click',
+    'place': 'right_click'
+}
+
+# Game states
+STATE_MENU = 0
+STATE_PLAYING = 1
+STATE_SETTINGS = 2

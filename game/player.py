@@ -3,7 +3,7 @@ import math
 from .constants import *
 
 class Player:
-    def __init__(self, x, y):
+    def __init__(self, x, y, keybinds):
         self.x = x
         self.y = y
         self.width = BLOCK_SIZE - 8
@@ -14,6 +14,7 @@ class Player:
         self.jump_power = 16
         self.gravity = 0.8
         self.on_ground = False
+        self.keybinds = keybinds
         
         # Empty hotbar - player starts with nothing!
         self.hotbar = [BLOCK_AIR for _ in range(HOTBAR_SIZE)]
@@ -49,9 +50,6 @@ class Player:
         else:
             self.y = new_y
             self.on_ground = False
-        
-        # Keep player in world bounds
-        self.x = max(0, min(WORLD_WIDTH * BLOCK_SIZE - self.width, self.x))
         
         # Update tool status
         self.update_tool_status()
@@ -95,14 +93,23 @@ class Player:
         return False
     
     def handle_input(self, keys):
-        """Handle player input"""
+        """Handle player input using configurable keybinds"""
         self.vel_x = 0
         
-        if keys[pygame.K_a] or keys[pygame.K_LEFT]:
+        # Convert keybind strings to pygame keys
+        def get_key_pressed(keybind_name):
+            key_name = self.keybinds.get(keybind_name, '')
+            if key_name == 'space':
+                return keys[pygame.K_SPACE]
+            elif len(key_name) == 1:
+                return keys[getattr(pygame, f'K_{key_name}', pygame.K_UNKNOWN)]
+            return False
+        
+        if get_key_pressed('move_left'):
             self.vel_x = -self.speed
-        if keys[pygame.K_d] or keys[pygame.K_RIGHT]:
+        if get_key_pressed('move_right'):
             self.vel_x = self.speed
-        if (keys[pygame.K_w] or keys[pygame.K_UP] or keys[pygame.K_SPACE]) and self.on_ground:
+        if get_key_pressed('jump') and self.on_ground:
             self.vel_y = -self.jump_power
     
     def select_hotbar_slot(self, slot):
@@ -122,8 +129,8 @@ class Player:
         
         # Check if player has a pickaxe to mine stone
         self.can_mine_stone = False
-        for block_type in self.inventory:
-            if block_type == BLOCK_WOOD:  # Wooden pickaxe (we'll add this to crafting)
+        for item_type in self.inventory:
+            if isinstance(item_type, str) and 'pickaxe' in item_type:
                 self.can_mine_stone = True
                 break
     
@@ -292,11 +299,27 @@ class Player:
         
         # Only draw if player is on screen
         if (-self.width <= screen_x <= SCREEN_WIDTH and -self.height <= screen_y <= SCREEN_HEIGHT):
-            # Draw player body
-            pygame.draw.rect(screen, (100, 150, 255), (screen_x, screen_y, self.width, self.height))
-            pygame.draw.rect(screen, BLACK, (screen_x, screen_y, self.width, self.height), 2)
+            # Draw player body with gradient
+            body_rect = pygame.Rect(screen_x, screen_y, self.width, self.height)
+            
+            # Body gradient
+            for y in range(self.height):
+                color_value = 100 + int((y / self.height) * 100)
+                color = (color_value, color_value + 50, 255)
+                pygame.draw.line(screen, color, 
+                               (screen_x, screen_y + y), 
+                               (screen_x + self.width, screen_y + y))
+            
+            # Body outline
+            pygame.draw.rect(screen, BLACK, body_rect, 2)
             
             # Draw simple face
             eye_size = 3
             pygame.draw.circle(screen, BLACK, (int(screen_x + self.width * 0.3), int(screen_y + 8)), eye_size)
             pygame.draw.circle(screen, BLACK, (int(screen_x + self.width * 0.7), int(screen_y + 8)), eye_size)
+            
+            # Draw mouth
+            mouth_y = int(screen_y + 16)
+            pygame.draw.arc(screen, BLACK, 
+                          (int(screen_x + self.width * 0.3), mouth_y - 2, 
+                           int(self.width * 0.4), 6), 0, 3.14, 2)
