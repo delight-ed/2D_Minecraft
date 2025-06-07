@@ -5,19 +5,25 @@ class Player:
     def __init__(self, x, y):
         self.x = x
         self.y = y
-        self.width = BLOCK_SIZE - 4
-        self.height = BLOCK_SIZE * 2 - 4
+        self.width = BLOCK_SIZE - 8
+        self.height = BLOCK_SIZE * 2 - 8
         self.vel_x = 0
         self.vel_y = 0
-        self.speed = 5
-        self.jump_power = 15
+        self.speed = 6
+        self.jump_power = 16
         self.gravity = 0.8
         self.on_ground = False
+        
+        # Hotbar and inventory
+        self.hotbar = [BLOCK_DIRT, BLOCK_STONE, BLOCK_GRASS, BLOCK_SAND, BLOCK_WOOD, 
+                      BLOCK_LEAVES, BLOCK_COAL, BLOCK_IRON, BLOCK_WATER]
+        self.selected_slot = 0
         self.inventory = {}
         
-        # Add some starting blocks
-        self.inventory[BLOCK_DIRT] = 10
-        self.inventory[BLOCK_STONE] = 5
+        # Add starting blocks
+        for block_type in self.hotbar:
+            if block_type != BLOCK_AIR:
+                self.inventory[block_type] = 64
     
     def update(self, world):
         """Update player physics and position"""
@@ -42,15 +48,18 @@ class Player:
         else:
             self.y = new_y
             self.on_ground = False
+        
+        # Keep player in world bounds
+        self.x = max(0, min(WORLD_WIDTH * BLOCK_SIZE - self.width, self.x))
     
     def check_collision(self, world, x, y):
         """Check collision with world blocks"""
         # Check corners of player rectangle
         corners = [
-            (x, y),
-            (x + self.width, y),
-            (x, y + self.height),
-            (x + self.width, y + self.height)
+            (x + 2, y + 2),
+            (x + self.width - 2, y + 2),
+            (x + 2, y + self.height - 2),
+            (x + self.width - 2, y + self.height - 2)
         ]
         
         for corner_x, corner_y in corners:
@@ -71,10 +80,32 @@ class Player:
         if (keys[pygame.K_w] or keys[pygame.K_UP] or keys[pygame.K_SPACE]) and self.on_ground:
             self.vel_y = -self.jump_power
     
+    def select_hotbar_slot(self, slot):
+        """Select hotbar slot"""
+        if 0 <= slot < HOTBAR_SIZE:
+            self.selected_slot = slot
+    
+    def get_selected_block(self):
+        """Get currently selected block type"""
+        if self.selected_slot < len(self.hotbar):
+            return self.hotbar[self.selected_slot]
+        return BLOCK_AIR
+    
     def mine_block(self, world, mouse_x, mouse_y, camera_x, camera_y):
         """Mine block at mouse position"""
         world_x = int((mouse_x + camera_x) // BLOCK_SIZE)
         world_y = int((mouse_y + camera_y) // BLOCK_SIZE)
+        
+        # Check mining range
+        player_center_x = self.x + self.width // 2
+        player_center_y = self.y + self.height // 2
+        block_center_x = world_x * BLOCK_SIZE + BLOCK_SIZE // 2
+        block_center_y = world_y * BLOCK_SIZE + BLOCK_SIZE // 2
+        
+        distance = ((player_center_x - block_center_x) ** 2 + (player_center_y - block_center_y) ** 2) ** 0.5
+        
+        if distance > BLOCK_SIZE * 5:  # Mining range limit
+            return False
         
         block_type = world.get_block(world_x, world_y)
         if block_type != BLOCK_AIR:
@@ -87,22 +118,48 @@ class Player:
             return True
         return False
     
-    def place_block(self, world, mouse_x, mouse_y, camera_x, camera_y, block_type):
+    def place_block(self, world, mouse_x, mouse_y, camera_x, camera_y):
         """Place block at mouse position"""
         world_x = int((mouse_x + camera_x) // BLOCK_SIZE)
         world_y = int((mouse_y + camera_y) // BLOCK_SIZE)
         
-        if world.get_block(world_x, world_y) == BLOCK_AIR:
+        # Check placement range
+        player_center_x = self.x + self.width // 2
+        player_center_y = self.y + self.height // 2
+        block_center_x = world_x * BLOCK_SIZE + BLOCK_SIZE // 2
+        block_center_y = world_y * BLOCK_SIZE + BLOCK_SIZE // 2
+        
+        distance = ((player_center_x - block_center_x) ** 2 + (player_center_y - block_center_y) ** 2) ** 0.5
+        
+        if distance > BLOCK_SIZE * 5:  # Placement range limit
+            return False
+        
+        block_type = self.get_selected_block()
+        
+        if world.get_block(world_x, world_y) == BLOCK_AIR and block_type != BLOCK_AIR:
             if block_type in self.inventory and self.inventory[block_type] > 0:
-                world.set_block(world_x, world_y, block_type)
-                self.inventory[block_type] -= 1
-                if self.inventory[block_type] == 0:
-                    del self.inventory[block_type]
-                return True
+                # Don't place block inside player
+                test_rect = pygame.Rect(world_x * BLOCK_SIZE, world_y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE)
+                player_rect = pygame.Rect(self.x, self.y, self.width, self.height)
+                
+                if not test_rect.colliderect(player_rect):
+                    world.set_block(world_x, world_y, block_type)
+                    self.inventory[block_type] -= 1
+                    if self.inventory[block_type] == 0:
+                        del self.inventory[block_type]
+                    return True
         return False
     
     def draw(self, screen, camera_x, camera_y):
         """Draw player"""
         screen_x = self.x - camera_x
         screen_y = self.y - camera_y
-        pygame.draw.rect(screen, RED, (screen_x, screen_y, self.width, self.height))
+        
+        # Draw player body
+        pygame.draw.rect(screen, (100, 150, 255), (screen_x, screen_y, self.width, self.height))
+        pygame.draw.rect(screen, BLACK, (screen_x, screen_y, self.width, self.height), 2)
+        
+        # Draw simple face
+        eye_size = 3
+        pygame.draw.circle(screen, BLACK, (int(screen_x + self.width * 0.3), int(screen_y + 8)), eye_size)
+        pygame.draw.circle(screen, BLACK, (int(screen_x + self.width * 0.7), int(screen_y + 8)), eye_size)

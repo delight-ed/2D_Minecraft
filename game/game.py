@@ -8,25 +8,30 @@ from .renderer import Renderer
 
 class Game:
     def __init__(self):
+        pygame.init()
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         pygame.display.set_caption("2D Minecraft Survival")
         self.clock = pygame.time.Clock()
         
         # Initialize game objects
+        print("Generating world...")
         self.world = World()
-        self.player = Player(WORLD_WIDTH * BLOCK_SIZE // 2, 0)  # Start in middle of world
+        print("World generated!")
+        
+        # Find spawn position
+        spawn_x = WORLD_WIDTH // 2
+        spawn_y = 0
+        for y in range(WORLD_HEIGHT):
+            if self.world.get_block(spawn_x, y) != BLOCK_AIR:
+                spawn_y = (y - 3) * BLOCK_SIZE
+                break
+        
+        self.player = Player(spawn_x * BLOCK_SIZE, spawn_y)
         self.camera = Camera()
         self.renderer = Renderer(self.screen)
         
-        # Find a good spawn position (on surface)
-        spawn_x = WORLD_WIDTH // 2
-        for y in range(WORLD_HEIGHT):
-            if self.world.get_block(spawn_x, y) != BLOCK_AIR:
-                self.player.y = (y - 2) * BLOCK_SIZE
-                break
-        
-        self.selected_block = BLOCK_DIRT
         self.running = True
+        print("Game initialized!")
     
     def handle_events(self):
         """Handle pygame events"""
@@ -35,17 +40,14 @@ class Game:
                 self.running = False
             
             elif event.type == pygame.KEYDOWN:
-                # Block selection
-                if event.key == pygame.K_1:
-                    self.selected_block = BLOCK_DIRT
-                elif event.key == pygame.K_2:
-                    self.selected_block = BLOCK_STONE
-                elif event.key == pygame.K_3:
-                    self.selected_block = BLOCK_GRASS
-                elif event.key == pygame.K_4:
-                    self.selected_block = BLOCK_SAND
-                elif event.key == pygame.K_5:
-                    self.selected_block = BLOCK_WATER
+                # Hotbar selection
+                if pygame.K_1 <= event.key <= pygame.K_9:
+                    slot = event.key - pygame.K_1
+                    self.player.select_hotbar_slot(slot)
+                
+                # Quit game
+                elif event.key == pygame.K_ESCAPE:
+                    self.running = False
             
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_x, mouse_y = pygame.mouse.get_pos()
@@ -56,8 +58,7 @@ class Game:
                 
                 elif event.button == 3:  # Right click - place
                     self.player.place_block(self.world, mouse_x, mouse_y,
-                                          self.camera.x, self.camera.y, 
-                                          self.selected_block)
+                                          self.camera.x, self.camera.y)
     
     def update(self):
         """Update game state"""
@@ -68,7 +69,7 @@ class Game:
     
     def draw(self):
         """Draw everything"""
-        self.screen.fill(BLACK)
+        self.screen.fill((135, 206, 235))  # Sky blue background
         
         # Draw world and player
         self.renderer.draw_world(self.world, self.camera)
@@ -76,11 +77,6 @@ class Game:
         
         # Draw UI
         self.renderer.draw_ui(self.player)
-        
-        # Draw selected block indicator
-        block_name = self.renderer.get_block_name(self.selected_block)
-        selected_text = self.renderer.font.render(f"Selected: {block_name}", True, WHITE)
-        self.screen.blit(selected_text, (SCREEN_WIDTH - 200, 10))
         
         pygame.display.flip()
     
@@ -91,3 +87,6 @@ class Game:
             self.update()
             self.draw()
             self.clock.tick(FPS)
+        
+        pygame.quit()
+        sys.exit()
