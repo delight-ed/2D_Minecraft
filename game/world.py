@@ -242,13 +242,28 @@ class World:
             'vel_y': -2,  # Initial upward velocity
             'vel_x': random.uniform(-1, 1),  # Random horizontal velocity
             'time': 0,
-            'on_ground': False
+            'on_ground': False,
+            'at_rest': False  # New flag to track if item is completely at rest
         })
     
     def update_item_drops(self):
         """Update physics for item drops"""
         for item in self.item_drops:
             item['time'] += 1
+            
+            # Skip physics if item is at rest
+            if item['at_rest']:
+                # Check if the block below was removed
+                block_x = int(item['x'] // BLOCK_SIZE)
+                block_y = int((item['y'] + 8) // BLOCK_SIZE)  # Check block below item
+                
+                if not self.is_solid(block_x, block_y):
+                    # Block below was removed, start falling again
+                    item['at_rest'] = False
+                    item['on_ground'] = False
+                    item['vel_y'] = 0
+                else:
+                    continue  # Skip physics update
             
             # Apply gravity
             if not item['on_ground']:
@@ -258,6 +273,13 @@ class World:
             
             # Apply friction to horizontal movement
             item['vel_x'] *= 0.98
+            
+            # Check if velocities are very small (item should come to rest)
+            if item['on_ground'] and abs(item['vel_x']) < 0.1 and abs(item['vel_y']) < 0.1:
+                item['vel_x'] = 0
+                item['vel_y'] = 0
+                item['at_rest'] = True
+                continue
             
             # Move item
             new_x = item['x'] + item['vel_x']
@@ -274,16 +296,17 @@ class World:
             
             # Check vertical collision
             block_x = int(item['x'] // BLOCK_SIZE)
-            block_y = int(new_y // BLOCK_SIZE)
+            block_y = int((new_y + 8) // BLOCK_SIZE)  # Check bottom of item
             
-            if self.is_solid(block_x, block_y):
-                # Find the top of the block
+            if self.is_solid(block_x, block_y) and item['vel_y'] > 0:
+                # Find the exact top of the block
                 item['y'] = block_y * BLOCK_SIZE - 8
                 item['vel_y'] = 0
                 item['on_ground'] = True
             else:
                 item['y'] = new_y
-                item['on_ground'] = False
+                if item['vel_y'] > 0:  # Only set on_ground to False when falling
+                    item['on_ground'] = False
     
     def find_spawn_position(self):
         """Find a safe spawn position on the surface"""

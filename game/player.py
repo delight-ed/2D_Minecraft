@@ -136,18 +136,33 @@ class Player:
     
     def has_line_of_sight(self, world, target_x, target_y):
         """Check if player has clear line of sight to target position"""
-        player_center_x = self.x + self.width // 2
-        player_center_y = self.y + self.height // 2
+        # Check from all four corners of player's head (top portion)
+        head_height = self.height // 3  # Top third of player
+        check_points = [
+            (self.x + 2, self.y + 2),                           # Top-left corner
+            (self.x + self.width - 2, self.y + 2),              # Top-right corner
+            (self.x + 2, self.y + head_height),                 # Mid-left of head
+            (self.x + self.width - 2, self.y + head_height)     # Mid-right of head
+        ]
         
+        # If any corner has line of sight, allow the action
+        for start_x, start_y in check_points:
+            if self.check_line_of_sight_from_point(world, start_x, start_y, target_x, target_y):
+                return True
+        
+        return False
+    
+    def check_line_of_sight_from_point(self, world, start_x, start_y, target_x, target_y):
+        """Check line of sight from a specific point to target"""
         # Use Bresenham's line algorithm to check each block along the path
-        dx = abs(target_x - player_center_x)
-        dy = abs(target_y - player_center_y)
+        dx = abs(target_x - start_x)
+        dy = abs(target_y - start_y)
         
-        x = int(player_center_x // BLOCK_SIZE)
-        y = int(player_center_y // BLOCK_SIZE)
+        x = int(start_x // BLOCK_SIZE)
+        y = int(start_y // BLOCK_SIZE)
         
-        x_inc = 1 if target_x > player_center_x else -1
-        y_inc = 1 if target_y > player_center_y else -1
+        x_inc = 1 if target_x > start_x else -1
+        y_inc = 1 if target_y > start_y else -1
         
         error = dx - dy
         
@@ -208,7 +223,7 @@ class Player:
                     break
     
     def mine_block(self, world, mouse_x, mouse_y, camera_x, camera_y):
-        """Mine block at mouse position with line of sight check"""
+        """Mine block at mouse position with improved line of sight check"""
         world_x = int((mouse_x + camera_x) // BLOCK_SIZE)
         world_y = int((mouse_y + camera_y) // BLOCK_SIZE)
         
@@ -223,7 +238,7 @@ class Player:
         if distance > BLOCK_SIZE * 5:  # Mining range limit
             return False
         
-        # Check line of sight
+        # Check line of sight from player's head
         if not self.has_line_of_sight(world, block_center_x, block_center_y):
             return False
         
@@ -241,7 +256,7 @@ class Player:
         return False
     
     def place_block(self, world, mouse_x, mouse_y, camera_x, camera_y):
-        """Place block at mouse position with line of sight check"""
+        """Place block at mouse position with improved placement rules"""
         world_x = int((mouse_x + camera_x) // BLOCK_SIZE)
         world_y = int((mouse_y + camera_y) // BLOCK_SIZE)
         
@@ -256,13 +271,34 @@ class Player:
         if distance > BLOCK_SIZE * 5:  # Placement range limit
             return False
         
-        # Check line of sight (but allow placing adjacent to solid blocks)
+        # Check line of sight from player's head
         if not self.has_line_of_sight(world, block_center_x, block_center_y):
             return False
         
+        # Check if target position is air
+        if world.get_block(world_x, world_y) != BLOCK_AIR:
+            return False
+        
+        # Check if there's a solid block adjacent (can't place in mid-air)
+        adjacent_positions = [
+            (world_x - 1, world_y),  # Left
+            (world_x + 1, world_y),  # Right
+            (world_x, world_y - 1),  # Above
+            (world_x, world_y + 1)   # Below
+        ]
+        
+        has_adjacent_solid = False
+        for adj_x, adj_y in adjacent_positions:
+            if world.is_solid(adj_x, adj_y):
+                has_adjacent_solid = True
+                break
+        
+        if not has_adjacent_solid:
+            return False  # Can't place in mid-air
+        
         block_type = self.get_selected_block()
         
-        if world.get_block(world_x, world_y) == BLOCK_AIR and block_type != BLOCK_AIR:
+        if block_type != BLOCK_AIR:
             if block_type in self.inventory and self.inventory[block_type] > 0:
                 # Don't place block inside player
                 test_rect = pygame.Rect(world_x * BLOCK_SIZE, world_y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE)

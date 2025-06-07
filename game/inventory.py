@@ -27,7 +27,7 @@ class InventoryGUI:
         self.gui_x = (SCREEN_WIDTH - self.gui_width) // 2
         self.gui_y = (SCREEN_HEIGHT - self.gui_height) // 2
         
-        # Crafting area (top section)
+        # Crafting area (top section) - 2x2 only
         self.crafting_x = self.gui_x + 20
         self.crafting_y = self.gui_y + 50
         
@@ -58,9 +58,9 @@ class InventoryGUI:
                 self.gui_y <= mouse_y <= self.gui_y + self.gui_height):
             return False
         
-        # Check crafting grid clicks
-        for row in range(3):
-            for col in range(3):
+        # Check crafting grid clicks (2x2 only)
+        for row in range(2):
+            for col in range(2):
                 slot_x = self.crafting_x + col * (self.slot_size + self.margin)
                 slot_y = self.crafting_y + row * (self.slot_size + self.margin)
                 
@@ -70,8 +70,8 @@ class InventoryGUI:
                     return True
         
         # Check crafting result click
-        result_x = self.crafting_x + 4 * (self.slot_size + self.margin)
-        result_y = self.crafting_y + 1 * (self.slot_size + self.margin)
+        result_x = self.crafting_x + 3 * (self.slot_size + self.margin)
+        result_y = self.crafting_y + 0.5 * (self.slot_size + self.margin)
         
         if (result_x <= mouse_x <= result_x + self.slot_size and
             result_y <= mouse_y <= result_y + self.slot_size):
@@ -96,11 +96,7 @@ class InventoryGUI:
         return True
     
     def handle_crafting_click(self, row, col, player, offset_x, offset_y):
-        """Handle clicks in crafting grid"""
-        # Skip if this slot is disabled in 2x2 mode
-        if not self.crafting_system.is_crafting_table and (row >= 2 or col >= 2):
-            return
-        
+        """Handle clicks in crafting grid (2x2 only)"""
         current_item = self.crafting_system.get_item(row, col)
         
         if self.selected_item:
@@ -131,12 +127,21 @@ class InventoryGUI:
     def handle_result_click(self, player, offset_x, offset_y):
         """Handle clicks on crafting result"""
         if self.crafting_system.result and not self.selected_item:
-            if self.crafting_system.craft_item(player.inventory):
-                # Successfully crafted
-                result_item, result_count = self.crafting_system.result
-                self.selected_item = (result_item, result_count)
-                self.drag_offset_x = offset_x
-                self.drag_offset_y = offset_y
+            # Check if we can craft (have ingredients in inventory)
+            recipe_data = CRAFTING_RECIPES.get(self.crafting_system.result[0])
+            if recipe_data:
+                can_craft = True
+                for req_item, req_count in recipe_data['ingredients']:
+                    if req_item not in player.inventory or player.inventory[req_item] < req_count:
+                        can_craft = False
+                        break
+                
+                if can_craft and self.crafting_system.craft_item(player.inventory):
+                    # Successfully crafted
+                    result_item, result_count = self.crafting_system.result
+                    self.selected_item = (result_item, result_count)
+                    self.drag_offset_x = offset_x
+                    self.drag_offset_y = offset_y
     
     def handle_inventory_click(self, row, col, player, offset_x, offset_y):
         """Handle clicks in inventory grid"""
@@ -228,7 +233,7 @@ class InventoryGUI:
                               self.selected_item[0], self.selected_item[1], alpha=200)
     
     def draw_crafting_section(self):
-        """Draw the crafting section"""
+        """Draw the crafting section (2x2 only)"""
         # Section background
         section_rect = pygame.Rect(self.crafting_x - 10, self.crafting_y - 30, 
                                  self.gui_width - 40, 180)
@@ -236,42 +241,29 @@ class InventoryGUI:
         pygame.draw.rect(self.screen, LIGHT_GRAY, section_rect, 2)
         
         # Title
-        mode_text = "Crafting Table (3x3)" if self.crafting_system.is_crafting_table else "Crafting (2x2)"
-        title = self.small_font.render(mode_text, True, WHITE)
+        title = self.small_font.render("Crafting (2x2)", True, WHITE)
         self.screen.blit(title, (self.crafting_x, self.crafting_y - 25))
         
-        # Draw crafting grid
-        grid_size = 3 if self.crafting_system.is_crafting_table else 2
-        
-        for row in range(3):
-            for col in range(3):
+        # Draw 2x2 crafting grid
+        for row in range(2):
+            for col in range(2):
                 slot_x = self.crafting_x + col * (self.slot_size + self.margin)
                 slot_y = self.crafting_y + row * (self.slot_size + self.margin)
                 
-                # Determine if slot is active
-                is_active = row < grid_size and col < grid_size
-                
                 # Draw slot
-                if is_active:
-                    pygame.draw.rect(self.screen, (100, 100, 100), 
-                                   (slot_x, slot_y, self.slot_size, self.slot_size))
-                    pygame.draw.rect(self.screen, WHITE, 
-                                   (slot_x, slot_y, self.slot_size, self.slot_size), 2)
-                else:
-                    pygame.draw.rect(self.screen, (40, 40, 40), 
-                                   (slot_x, slot_y, self.slot_size, self.slot_size))
-                    pygame.draw.rect(self.screen, DARK_GRAY, 
-                                   (slot_x, slot_y, self.slot_size, self.slot_size), 1)
+                pygame.draw.rect(self.screen, (100, 100, 100), 
+                               (slot_x, slot_y, self.slot_size, self.slot_size))
+                pygame.draw.rect(self.screen, WHITE, 
+                               (slot_x, slot_y, self.slot_size, self.slot_size), 2)
                 
                 # Draw item in slot
-                if is_active:
-                    item = self.crafting_system.get_item(row, col)
-                    if item:
-                        self.draw_item_icon(slot_x + 2, slot_y + 2, item[0], item[1])
+                item = self.crafting_system.get_item(row, col)
+                if item:
+                    self.draw_item_icon(slot_x + 2, slot_y + 2, item[0], item[1])
         
         # Draw arrow
-        arrow_x = self.crafting_x + 3.5 * (self.slot_size + self.margin)
-        arrow_y = self.crafting_y + 1 * (self.slot_size + self.margin) + self.slot_size // 2
+        arrow_x = self.crafting_x + 2.5 * (self.slot_size + self.margin)
+        arrow_y = self.crafting_y + 0.5 * (self.slot_size + self.margin) + self.slot_size // 2
         
         # Arrow background
         pygame.draw.circle(self.screen, (80, 80, 80), (int(arrow_x + 10), int(arrow_y)), 15)
@@ -285,8 +277,8 @@ class InventoryGUI:
         ])
         
         # Draw result slot
-        result_x = self.crafting_x + 4.5 * (self.slot_size + self.margin)
-        result_y = self.crafting_y + 1 * (self.slot_size + self.margin)
+        result_x = self.crafting_x + 3 * (self.slot_size + self.margin)
+        result_y = self.crafting_y + 0.5 * (self.slot_size + self.margin)
         
         pygame.draw.rect(self.screen, (120, 120, 120), 
                         (result_x, result_y, self.slot_size, self.slot_size))

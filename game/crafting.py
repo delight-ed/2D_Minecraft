@@ -13,47 +13,12 @@ CRAFTING_RECIPES = {
         'shapeless': True
     },
     
-    # 3x3 recipes (crafting table required)
-    'wooden_pickaxe': {
-        'count': 1,
-        'ingredients': [(BLOCK_WOOD, 3), ('stick', 2)],
-        'pattern': [
-            [BLOCK_WOOD, BLOCK_WOOD, BLOCK_WOOD],
-            [None, 'stick', None],
-            [None, 'stick', None]
-        ],
-        'shapeless': False
-    },
-    
-    'wooden_axe': {
-        'count': 1,
-        'ingredients': [(BLOCK_WOOD, 3), ('stick', 2)],
-        'pattern': [
-            [BLOCK_WOOD, BLOCK_WOOD, None],
-            [BLOCK_WOOD, 'stick', None],
-            [None, 'stick', None]
-        ],
-        'shapeless': False
-    },
-    
-    'wooden_shovel': {
-        'count': 1,
-        'ingredients': [(BLOCK_WOOD, 1), ('stick', 2)],
-        'pattern': [
-            [None, BLOCK_WOOD, None],
-            [None, 'stick', None],
-            [None, 'stick', None]
-        ],
-        'shapeless': False
-    },
-    
     'stick': {
         'count': 4,
         'ingredients': [(BLOCK_WOOD, 2)],
         'pattern': [
-            [None, None, None],
-            [BLOCK_WOOD, None, None],
-            [BLOCK_WOOD, None, None]
+            [BLOCK_WOOD, None],
+            [BLOCK_WOOD, None]
         ],
         'shapeless': True
     },
@@ -71,25 +36,12 @@ CRAFTING_RECIPES = {
 
 class CraftingSystem:
     def __init__(self):
-        self.crafting_grid = [[None for _ in range(3)] for _ in range(3)]
+        self.crafting_grid = [[None for _ in range(2)] for _ in range(2)]  # 2x2 grid
         self.result = None
-        self.is_crafting_table = False
-    
-    def set_crafting_table_mode(self, enabled):
-        """Enable or disable crafting table mode (3x3 vs 2x2)"""
-        self.is_crafting_table = enabled
-        if not enabled:
-            # Clear the 3x3 grid when switching to 2x2
-            for i in range(3):
-                for j in range(3):
-                    if i >= 2 or j >= 2:
-                        self.crafting_grid[i][j] = None
-        self.update_result()
     
     def set_item(self, row, col, item_type, count):
         """Set item in crafting grid"""
-        max_size = 3 if self.is_crafting_table else 2
-        if 0 <= row < max_size and 0 <= col < max_size:
+        if 0 <= row < 2 and 0 <= col < 2:
             if count > 0:
                 self.crafting_grid[row][col] = (item_type, count)
             else:
@@ -98,25 +50,24 @@ class CraftingSystem:
     
     def get_item(self, row, col):
         """Get item from crafting grid"""
-        if 0 <= row < 3 and 0 <= col < 3:
+        if 0 <= row < 2 and 0 <= col < 2:
             return self.crafting_grid[row][col]
         return None
     
     def clear_grid(self):
         """Clear the crafting grid"""
-        for i in range(3):
-            for j in range(3):
+        for i in range(2):
+            for j in range(2):
                 self.crafting_grid[i][j] = None
         self.update_result()
     
     def get_grid_pattern(self):
         """Get the current crafting grid as a pattern"""
         pattern = []
-        grid_size = 3 if self.is_crafting_table else 2
         
-        for row in range(grid_size):
+        for row in range(2):
             pattern_row = []
-            for col in range(grid_size):
+            for col in range(2):
                 item = self.crafting_grid[row][col]
                 if item:
                     pattern_row.append(item[0])
@@ -209,13 +160,10 @@ class CraftingSystem:
         """Update the crafting result based on current grid"""
         self.result = None
         
-        # Get the effective grid size
-        grid_size = 3 if self.is_crafting_table else 2
-        
         # Count ingredients in the grid
         ingredients = {}
-        for i in range(grid_size):
-            for j in range(grid_size):
+        for i in range(2):
+            for j in range(2):
                 item = self.crafting_grid[i][j]
                 if item:
                     item_type, count = item
@@ -229,10 +177,6 @@ class CraftingSystem:
         
         # Check each recipe
         for result_item, recipe_data in CRAFTING_RECIPES.items():
-            # Skip 3x3 recipes if not using crafting table
-            if not self.is_crafting_table and self.requires_crafting_table(result_item):
-                continue
-            
             # Check if we have all required ingredients
             can_craft = True
             for req_item, req_count in recipe_data['ingredients']:
@@ -256,20 +200,6 @@ class CraftingSystem:
                     self.result = (result_item, recipe_data['count'])
                     break
     
-    def requires_crafting_table(self, item):
-        """Check if an item requires a crafting table to craft"""
-        if item not in CRAFTING_RECIPES:
-            return False
-        
-        recipe = CRAFTING_RECIPES[item]
-        pattern = recipe['pattern']
-        
-        # Check if pattern is larger than 2x2
-        if len(pattern) > 2 or any(len(row) > 2 for row in pattern):
-            return True
-        
-        return False
-    
     def craft_item(self, player_inventory):
         """Attempt to craft the current result"""
         if not self.result:
@@ -284,9 +214,8 @@ class CraftingSystem:
                 return False
         
         # Remove ingredients from crafting grid
-        grid_size = 3 if self.is_crafting_table else 2
-        for i in range(grid_size):
-            for j in range(grid_size):
+        for i in range(2):
+            for j in range(2):
                 item = self.crafting_grid[i][j]
                 if item:
                     item_type, count = item
