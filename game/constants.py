@@ -1,0 +1,40 @@
+# Game constants
+SCREEN_WIDTH = 1200
+SCREEN_HEIGHT = 800
+FPS = 60
+
+# Block size
+BLOCK_SIZE = 32
+
+# Colors
+BLACK = (0, 0, 0)
+WHITE = (255, 255, 255)
+BROWN = (139, 69, 19)
+GREEN = (34, 139, 34)
+GRAY = (128, 128, 128)
+BLUE = (30, 144, 255)
+YELLOW = (255, 255, 0)
+RED = (255, 0, 0)
+
+# Block types
+BLOCK_AIR = 0
+BLOCK_DIRT = 1
+BLOCK_GRASS = 2
+BLOCK_STONE = 3
+BLOCK_WATER = 4
+BLOCK_SAND = 5
+
+# Block colors
+BLOCK_COLORS = {
+    BLOCK_AIR: None,
+    BLOCK_DIRT: BROWN,
+    BLOCK_GRASS: GREEN,
+    BLOCK_STONE: GRAY,
+    BLOCK_WATER: BLUE,
+    BLOCK_SAND: YELLOW
+}
+
+# World settings
+WORLD_WIDTH = 200
+WORLD_HEIGHT = 100
+SURFACE_LEVEL = 60
