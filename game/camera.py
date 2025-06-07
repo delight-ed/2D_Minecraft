@@ -15,13 +15,16 @@ class Camera:
         self.target_y = player.y + player.height // 2 - SCREEN_HEIGHT // 2
         
         # Clamp target to world bounds
-        self.target_x = max(0, min(WORLD_WIDTH * BLOCK_SIZE - SCREEN_WIDTH, self.target_x))
-        self.target_y = max(0, min(WORLD_HEIGHT * BLOCK_SIZE - SCREEN_HEIGHT, self.target_y))
+        max_x = WORLD_WIDTH * BLOCK_SIZE - SCREEN_WIDTH
+        max_y = WORLD_HEIGHT * BLOCK_SIZE - SCREEN_HEIGHT
+        
+        self.target_x = max(0, min(max_x, self.target_x))
+        self.target_y = max(0, min(max_y, self.target_y))
         
         # Smooth camera movement
         self.x += (self.target_x - self.x) * self.smoothing
         self.y += (self.target_y - self.y) * self.smoothing
         
         # Ensure camera stays within bounds
-        self.x = max(0, min(WORLD_WIDTH * BLOCK_SIZE - SCREEN_WIDTH, self.x))
-        self.y = max(0, min(WORLD_HEIGHT * BLOCK_SIZE - SCREEN_HEIGHT, self.y))
+        self.x = max(0, min(max_x, self.x))
+        self.y = max(0, min(max_y, self.y))

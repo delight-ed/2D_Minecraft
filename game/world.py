@@ -10,16 +10,16 @@ class World:
     
     def generate_world(self):
         """Generate a realistic 2D world with biomes and structures"""
-        # Generate biomes first
+        print("Generating biomes...")
         self.generate_biomes()
         
-        # Generate terrain
+        print("Generating terrain...")
         self.generate_terrain()
         
-        # Add ores
+        print("Adding ores...")
         self.generate_ores()
         
-        # Add structures
+        print("Adding structures...")
         self.generate_structures()
     
     def generate_biomes(self):
@@ -54,9 +54,9 @@ class World:
             # Clamp surface height
             surface_height = max(20, min(WORLD_HEIGHT - 20, surface_height))
             
-            # Fill blocks from bottom to surface
+            # Fill blocks from surface down to bottom
             for y in range(WORLD_HEIGHT):
-                if y > surface_height:
+                if y < surface_height:
                     # Air above surface
                     self.blocks[x][y] = BLOCK_AIR
                 elif y == surface_height:
@@ -65,22 +65,22 @@ class World:
                         self.blocks[x][y] = BLOCK_SAND
                     else:
                         self.blocks[x][y] = BLOCK_GRASS
-                elif y > surface_height - 4:
-                    # Dirt layer
+                elif y < surface_height + 4:
+                    # Dirt layer below surface
                     if biome == BIOME_DESERT:
                         self.blocks[x][y] = BLOCK_SAND
                     else:
                         self.blocks[x][y] = BLOCK_DIRT
                 else:
-                    # Stone below
+                    # Stone below dirt
                     self.blocks[x][y] = BLOCK_STONE
     
     def generate_ores(self):
         """Generate ore deposits"""
-        # Coal ore
+        # Coal ore (closer to surface)
         for _ in range(WORLD_WIDTH * 2):
             x = random.randint(0, WORLD_WIDTH - 1)
-            y = random.randint(SURFACE_LEVEL - 30, WORLD_HEIGHT - 10)
+            y = random.randint(SURFACE_LEVEL + 10, WORLD_HEIGHT - 10)
             
             if self.get_block(x, y) == BLOCK_STONE:
                 # Create small coal vein
@@ -94,7 +94,7 @@ class World:
         # Iron ore (deeper)
         for _ in range(WORLD_WIDTH):
             x = random.randint(0, WORLD_WIDTH - 1)
-            y = random.randint(SURFACE_LEVEL - 20, WORLD_HEIGHT - 5)
+            y = random.randint(SURFACE_LEVEL + 20, WORLD_HEIGHT - 5)
             
             if self.get_block(x, y) == BLOCK_STONE and random.random() < 0.3:
                 self.blocks[x][y] = BLOCK_IRON
@@ -125,19 +125,20 @@ class World:
         """Generate a tree at the given position"""
         tree_height = random.randint(4, 7)
         
-        # Tree trunk
-        for y in range(surface_y - tree_height, surface_y):
-            if 0 <= y < WORLD_HEIGHT:
-                self.blocks[x][y] = BLOCK_WOOD
+        # Tree trunk (going up from surface)
+        for i in range(tree_height):
+            trunk_y = surface_y - 1 - i
+            if trunk_y >= 0:
+                self.blocks[x][trunk_y] = BLOCK_WOOD
         
-        # Tree leaves
-        leaf_start = surface_y - tree_height
+        # Tree leaves (crown above trunk)
+        leaf_center_y = surface_y - tree_height - 1
         for dx in range(-2, 3):
             for dy in range(-2, 1):
                 leaf_x = x + dx
-                leaf_y = leaf_start + dy
+                leaf_y = leaf_center_y + dy
                 
-                if (0 <= leaf_x < WORLD_WIDTH and 0 <= leaf_y < WORLD_HEIGHT and
+                if (0 <= leaf_x < WORLD_WIDTH and 0 <= leaf_y >= 0 and
                     self.get_block(leaf_x, leaf_y) == BLOCK_AIR and
                     random.random() < 0.8):
                     self.blocks[leaf_x][leaf_y] = BLOCK_LEAVES
@@ -159,3 +160,16 @@ class World:
         """Check if block is solid (not air or water)"""
         block = self.get_block(x, y)
         return block != BLOCK_AIR and block != BLOCK_WATER
+    
+    def find_spawn_position(self):
+        """Find a safe spawn position on the surface"""
+        spawn_x = WORLD_WIDTH // 2
+        
+        # Find surface at spawn location
+        for y in range(WORLD_HEIGHT):
+            if self.get_block(spawn_x, y) != BLOCK_AIR:
+                # Spawn 3 blocks above the surface
+                return spawn_x * BLOCK_SIZE, (y - 3) * BLOCK_SIZE
+        
+        # Fallback if no surface found
+        return spawn_x * BLOCK_SIZE, SURFACE_LEVEL * BLOCK_SIZE

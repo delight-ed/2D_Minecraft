@@ -14,16 +14,12 @@ class Player:
         self.gravity = 0.8
         self.on_ground = False
         
-        # Hotbar and inventory
-        self.hotbar = [BLOCK_DIRT, BLOCK_STONE, BLOCK_GRASS, BLOCK_SAND, BLOCK_WOOD, 
-                      BLOCK_LEAVES, BLOCK_COAL, BLOCK_IRON, BLOCK_WATER]
+        # Empty hotbar - player starts with nothing!
+        self.hotbar = [BLOCK_AIR for _ in range(HOTBAR_SIZE)]
         self.selected_slot = 0
         self.inventory = {}
         
-        # Add starting blocks
-        for block_type in self.hotbar:
-            if block_type != BLOCK_AIR:
-                self.inventory[block_type] = 64
+        # No starting items - player must gather everything!
     
     def update(self, world):
         """Update player physics and position"""
@@ -91,6 +87,20 @@ class Player:
             return self.hotbar[self.selected_slot]
         return BLOCK_AIR
     
+    def add_to_inventory(self, block_type):
+        """Add block to inventory and try to put it in hotbar"""
+        if block_type in self.inventory:
+            self.inventory[block_type] += 1
+        else:
+            self.inventory[block_type] = 1
+        
+        # Try to add to hotbar if there's an empty slot
+        if block_type not in self.hotbar:
+            for i in range(len(self.hotbar)):
+                if self.hotbar[i] == BLOCK_AIR:
+                    self.hotbar[i] = block_type
+                    break
+    
     def mine_block(self, world, mouse_x, mouse_y, camera_x, camera_y):
         """Mine block at mouse position"""
         world_x = int((mouse_x + camera_x) // BLOCK_SIZE)
@@ -111,10 +121,7 @@ class Player:
         if block_type != BLOCK_AIR:
             world.set_block(world_x, world_y, BLOCK_AIR)
             # Add to inventory
-            if block_type in self.inventory:
-                self.inventory[block_type] += 1
-            else:
-                self.inventory[block_type] = 1
+            self.add_to_inventory(block_type)
             return True
         return False
     
@@ -147,6 +154,11 @@ class Player:
                     self.inventory[block_type] -= 1
                     if self.inventory[block_type] == 0:
                         del self.inventory[block_type]
+                        # Remove from hotbar if count reaches 0
+                        for i in range(len(self.hotbar)):
+                            if self.hotbar[i] == block_type:
+                                self.hotbar[i] = BLOCK_AIR
+                                break
                     return True
         return False
     
@@ -155,11 +167,13 @@ class Player:
         screen_x = self.x - camera_x
         screen_y = self.y - camera_y
         
-        # Draw player body
-        pygame.draw.rect(screen, (100, 150, 255), (screen_x, screen_y, self.width, self.height))
-        pygame.draw.rect(screen, BLACK, (screen_x, screen_y, self.width, self.height), 2)
-        
-        # Draw simple face
-        eye_size = 3
-        pygame.draw.circle(screen, BLACK, (int(screen_x + self.width * 0.3), int(screen_y + 8)), eye_size)
-        pygame.draw.circle(screen, BLACK, (int(screen_x + self.width * 0.7), int(screen_y + 8)), eye_size)
+        # Only draw if player is on screen
+        if (-self.width <= screen_x <= SCREEN_WIDTH and -self.height <= screen_y <= SCREEN_HEIGHT):
+            # Draw player body
+            pygame.draw.rect(screen, (100, 150, 255), (screen_x, screen_y, self.width, self.height))
+            pygame.draw.rect(screen, BLACK, (screen_x, screen_y, self.width, self.height), 2)
+            
+            # Draw simple face
+            eye_size = 3
+            pygame.draw.circle(screen, BLACK, (int(screen_x + self.width * 0.3), int(screen_y + 8)), eye_size)
+            pygame.draw.circle(screen, BLACK, (int(screen_x + self.width * 0.7), int(screen_y + 8)), eye_size)

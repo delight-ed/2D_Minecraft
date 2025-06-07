@@ -18,15 +18,11 @@ class Game:
         self.world = World()
         print("World generated!")
         
-        # Find spawn position
-        spawn_x = WORLD_WIDTH // 2
-        spawn_y = 0
-        for y in range(WORLD_HEIGHT):
-            if self.world.get_block(spawn_x, y) != BLOCK_AIR:
-                spawn_y = (y - 3) * BLOCK_SIZE
-                break
+        # Find proper spawn position
+        spawn_x, spawn_y = self.world.find_spawn_position()
+        print(f"Spawn position: {spawn_x}, {spawn_y}")
         
-        self.player = Player(spawn_x * BLOCK_SIZE, spawn_y)
+        self.player = Player(spawn_x, spawn_y)
         self.camera = Camera()
         self.renderer = Renderer(self.screen)
         
